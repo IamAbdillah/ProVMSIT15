@@ -1,0 +1,109 @@
+@model List<VendorScoreModel>
+@using ProVMSIT15.Controllers
+@{
+    ViewData["Title"] = "Benchmarking";
+    ViewData["BreadcrumbModule"] = "Supplier Evaluation";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-graph-up-arrow fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Benchmarking</h4>
+            <small class="opacity-75">Comparative supplier performance across evaluation dimensions</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="chart-card h-100">
+            <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart me-2 text-primary"></i>Overall Score Comparison</h6>
+            <canvas id="benchmarkChart"></canvas>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="chart-card h-100">
+            <h6 class="fw-bold mb-3"><i class="bi bi-radar me-2 text-primary"></i>Dimension Breakdown</h6>
+            <canvas id="dimensionChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-0">
+    <div class="px-4 py-3 border-bottom"><h6 class="fw-bold mb-0"><i class="bi bi-table me-2 text-primary"></i>Benchmark Matrix</h6></div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>Vendor</th>
+                    <th>Reviews</th>
+                    <th>Delivery Speed</th>
+                    <th>Item Condition</th>
+                    <th>Communication</th>
+                    <th>Overall</th>
+                    <th>Tier</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                <tr><td colspan="7" class="text-center text-muted py-4">No benchmark data available.</td></tr>
+                }
+                @foreach (var v in Model)
+                {
+                var tier = v.OverallAverage >= 4.5 ? "Platinum" : v.OverallAverage >= 3.5 ? "Gold" : v.OverallAverage >= 2.5 ? "Silver" : "Under Review";
+                var tierCls = v.OverallAverage >= 4.5 ? "badge bg-primary" : v.OverallAverage >= 3.5 ? "badge bg-warning text-dark" : v.OverallAverage >= 2.5 ? "badge bg-secondary" : "badge bg-danger";
+                <tr>
+                    <td class="fw-semibold">@v.CompanyName</td>
+                    <td>@v.EvaluationCount</td>
+                    <td>
+                        <div class="progress mb-1" style="height:6px"><div class="progress-bar bg-info" style="width:@((int)(v.AvgDelivery/5*100))%"></div></div>
+                        <small>@v.AvgDelivery.ToString("F1")/5</small>
+                    </td>
+                    <td>
+                        <div class="progress mb-1" style="height:6px"><div class="progress-bar bg-success" style="width:@((int)(v.AvgCondition/5*100))%"></div></div>
+                        <small>@v.AvgCondition.ToString("F1")/5</small>
+                    </td>
+                    <td>
+                        <div class="progress mb-1" style="height:6px"><div class="progress-bar bg-warning" style="width:@((int)(v.AvgCommunication/5*100))%"></div></div>
+                        <small>@v.AvgCommunication.ToString("F1")/5</small>
+                    </td>
+                    <td class="fw-bold">@v.OverallAverage.ToString("F2")</td>
+                    <td><span class="@tierCls">@tier</span></td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const labels = [@Html.Raw(string.Join(",", Model.Select(v => $"'{v.CompanyName}'")))];
+new Chart(document.getElementById('benchmarkChart'), {
+    type: 'bar',
+    data: {
+        labels,
+        datasets: [{
+            label: 'Overall Score',
+            data: [@string.Join(",", Model.Select(v => v.OverallAverage.ToString("F2")))],
+            backgroundColor: 'rgba(37,99,235,.7)',
+            borderRadius: 6
+        }]
+    },
+    options: { responsive: true, scales: { y: { min: 0, max: 5 } }, plugins: { legend: { display: false } } }
+});
+new Chart(document.getElementById('dimensionChart'), {
+    type: 'bar',
+    data: {
+        labels,
+        datasets: [
+            { label: 'Delivery', data: [@string.Join(",", Model.Select(v => v.AvgDelivery.ToString("F2")))], backgroundColor: 'rgba(6,182,212,.7)', borderRadius:4 },
+            { label: 'Condition', data: [@string.Join(",", Model.Select(v => v.AvgCondition.ToString("F2")))], backgroundColor: 'rgba(16,185,129,.7)', borderRadius:4 },
+            { label: 'Communication', data: [@string.Join(",", Model.Select(v => v.AvgCommunication.ToString("F2")))], backgroundColor: 'rgba(245,158,11,.7)', borderRadius:4 }
+        ]
+    },
+    options: { responsive: true, scales: { y: { min: 0, max: 5 } } }
+});
+</script>
+}

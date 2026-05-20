@@ -1,0 +1,71 @@
+@{
+    ViewData["Title"] = "Provision New User";
+    ViewData["BreadcrumbModule"] = "User Management";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-person-plus-fill fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Provision New Internal User</h4>
+            <small class="opacity-75">Pre-provision corporate personnel accounts. Vendors must self-register via public portal.</small>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="provms-card p-4">
+            <div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+                <i class="bi bi-shield-lock-fill fs-5 mt-1 flex-shrink-0"></i>
+                <div>
+                    <strong>Dual-Path Auth Gate:</strong> This form is exclusively for internal corporate personnel.
+                    Vendor accounts must register through the public onboarding wizard. The Vendor role cannot be assigned here.
+                </div>
+            </div>
+            <form asp-action="Create" method="post">
+                @Html.AntiForgeryToken()
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+                        <input name="fullName" class="form-control" placeholder="e.g. Juan dela Cruz" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Corporate Email <span class="text-danger">*</span></label>
+                        <input name="email" type="email" class="form-control" placeholder="employee@corp.com" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Temporary Password <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input name="password" type="password" class="form-control" id="pwdField" placeholder="Min 8 characters" required minlength="8" />
+                            <button type="button" class="btn btn-outline-secondary" onclick="var f=document.getElementById('pwdField');f.type=f.type==='password'?'text':'password'">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">System Role <span class="text-danger">*</span></label>
+                        <select name="role" class="form-select" required>
+                            <option value="">— Select Role —</option>
+                            <option value="Admin">Admin (System Administrator)</option>
+                            <option value="Finance">Finance (Budget Approver)</option>
+                            <option value="Procurement">Procurement (Buyer / PO Officer)</option>
+                            <option value="User">User (Internal Requester)</option>
+                        </select>
+                        <div class="form-text text-muted">Vendor role is excluded — public portal only.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Department Code</label>
+                        <input name="departmentCode" class="form-control" placeholder="e.g. IT, HR, FINANCE, OPS" maxlength="20" />
+                        <div class="form-text text-muted">Used for budget pre-encumbrance allocation. Required for User-role accounts.</div>
+                    </div>
+                    <div class="col-12 d-flex gap-3 justify-content-end pt-2 border-top mt-2">
+                        <a asp-action="Index" class="btn btn-outline-secondary px-4">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-5 fw-semibold">
+                            <i class="bi bi-person-check me-2"></i>Provision Account
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

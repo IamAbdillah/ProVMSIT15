@@ -1,0 +1,127 @@
+@model List<ProVMSIT15.Models.Contract>
+@{
+    ViewData["Title"] = "Pricing Management";
+    ViewData["BreadcrumbModule"] = "Contract Management";
+    var totalItems = Model.Sum(c => c.Items.Count);
+    var totalValue = Model.Sum(c => c.Items.Sum(i => i.NegotiatedUnitPrice * i.Quantity));
+    var avgDiscount = Model.Any() ? Model.Average(c => c.DiscountPercent) : 0;
+    var withPricing = Model.Count(c => c.Items.Any());
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-currency-exchange fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Pricing Management</h4>
+            <small class="opacity-75">Corporate pricing alignment board &amp; line item management</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Contracts with Pricing</div><div class="stat-value mt-1">@withPricing</div></div>
+                <i class="bi bi-file-earmark-check stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card teal">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Line Items</div><div class="stat-value mt-1">@totalItems</div></div>
+                <i class="bi bi-list-ol stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Total Portfolio Value</div>
+                    <div class="stat-value mt-1" style="font-size:1.1rem">₱@totalValue.ToString("N2")</div>
+                </div>
+                <i class="bi bi-wallet2 stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Avg Discount %</div><div class="stat-value mt-1">@avgDiscount.ToString("F1")%</div></div>
+                <i class="bi bi-percent stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+<div class="provms-card">
+    <div class="provms-empty-state">
+        <i class="bi bi-file-earmark-check empty-icon"></i>
+        <h5>No Contracts Found</h5>
+        <p>No active contracts with pricing have been configured yet.</p>
+    </div>
+</div>
+}
+
+@foreach (var contract in Model)
+{
+<div class="provms-card p-0 mb-4">
+    <div class="card-section-header">
+        <i class="bi bi-file-earmark-text text-primary"></i>
+        <div>
+            <span class="fw-bold"><code class="me-1 text-primary">CON-@contract.ID.ToString("D4")</code>@contract.ContractTitle</span>
+            <span class="text-muted ms-2" style="font-size:.8rem">@contract.Vendor?.CompanyName &middot; @contract.DiscountPercent% discount</span>
+        </div>
+        @{
+            var sCls = contract.Status switch {
+                ProVMSIT15.Models.ContractStatus.Active => "badge-active",
+                ProVMSIT15.Models.ContractStatus.Draft => "badge-draft",
+                ProVMSIT15.Models.ContractStatus.UnderNegotiation => "badge-negotiation",
+                _ => "badge-archived"
+            };
+        }
+        <span class="status-badge ms-auto @sCls">@contract.Status</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Vendor Item</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Currency</th>
+                    <th>Line Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!contract.Items.Any())
+                {
+                <tr><td colspan="6" class="text-center text-muted py-3">No line items configured.</td></tr>
+                }
+                @foreach (var item in contract.Items)
+                {
+                <tr>
+                    <td class="fw-semibold">@(item.VendorItem?.ItemName ?? "—")</td>
+                    <td class="small">@(item.VendorItem?.Category.ToString().Replace("_"," ") ?? "—")</td>
+                    <td>@item.Quantity</td>
+                    <td class="fw-bold">₱@item.NegotiatedUnitPrice.ToString("N2")</td>
+                    <td><span class="badge bg-secondary">@item.CurrencyCode</span></td>
+                    <td class="fw-bold text-success">₱@((item.NegotiatedUnitPrice * item.Quantity).ToString("N2"))</td>
+                </tr>
+                }
+                @if (contract.Items.Any())
+                {
+                <tr class="table-light fw-bold">
+                    <td colspan="5" class="text-end">Contract Total:</td>
+                    <td class="text-primary">₱@contract.Items.Sum(i => i.NegotiatedUnitPrice * i.Quantity).ToString("N2")</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+}

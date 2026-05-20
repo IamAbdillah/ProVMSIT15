@@ -1,0 +1,170 @@
+@model IEnumerable<ProVMSIT15.Models.PurchaseRequisition>
+@{
+    ViewData["Title"] = "Requisition Management";
+    ViewData["BreadcrumbModule"] = "Purchase Requisition";
+    var currentUserId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+    var isInternal = User.IsInRole("Admin") || User.IsInRole("Procurement") || User.IsInRole("Finance");
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-receipt fs-3"></i>
+            <div>
+                <h4 class="mb-0 fw-bold">Requisition Management</h4>
+                <small class="opacity-75">Track all purchase requisitions through the full workflow pipeline</small>
+            </div>
+        </div>
+        <a asp-controller="Catalog" asp-action="Marketplace" class="btn btn-warning fw-semibold">
+            <i class="bi bi-shop me-1"></i>Browse Marketplace
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Pending Finance</div><div class="stat-value mt-1">@Model.Count(r => r.WorkflowStatus == WorkflowStatus.Pending_Finance)</div></div>
+                <i class="bi bi-hourglass-split stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">In Transit</div><div class="stat-value mt-1">@Model.Count(r => r.WorkflowStatus == WorkflowStatus.In_Transit)</div></div>
+                <i class="bi bi-truck stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Delivered</div><div class="stat-value mt-1">@Model.Count(r => r.WorkflowStatus == WorkflowStatus.Delivered)</div></div>
+                <i class="bi bi-box-seam stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card red">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Spend</div><div class="stat-value mt-1" style="font-size:1.2rem">&#8369;@Model.Where(r => r.WorkflowStatus != WorkflowStatus.Archived).Sum(r => r.TotalCalculatedAmount).ToString("N0")</div></div>
+                <i class="bi bi-cash-stack stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+<div class="provms-card">
+    <div class="provms-empty-state">
+        <i class="bi bi-receipt empty-icon"></i>
+        <h5>No Requisitions Yet</h5>
+        <p>You haven't placed any purchase requisitions. Browse the marketplace to get started.</p>
+        <a asp-controller="Catalog" asp-action="Marketplace" class="btn btn-primary btn-sm">
+            <i class="bi bi-shop me-2"></i>Browse Marketplace
+        </a>
+    </div>
+</div>
+}
+else
+{
+<div class="provms-card p-0">
+    <div class="card-section-header">
+        <i class="bi bi-list-check text-primary"></i>
+        <h6>Transaction Ledger</h6>
+        <span class="badge ms-auto" style="background:#dbeafe;color:#1e40af">@Model.Count() records</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Item</th>
+                    <th>Vendor</th>
+                    <th>Qty</th>
+                    <th>Total</th>
+                    <th>Encumbered</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var req in Model)
+                {
+                var cls = req.WorkflowStatus == WorkflowStatus.Pending_Finance ? "badge-pending" :
+                          req.WorkflowStatus == WorkflowStatus.Delivered ? "badge-delivered" :
+                          req.WorkflowStatus == WorkflowStatus.Archived ? "badge-archived" : "badge-workflow";
+                var icon = req.WorkflowStatus == WorkflowStatus.Pending_Finance ? "bi-hourglass-split" :
+                           req.WorkflowStatus == WorkflowStatus.Approved_Budget ? "bi-check-circle" :
+                           req.WorkflowStatus == WorkflowStatus.PO_Issued ? "bi-file-text" :
+                           req.WorkflowStatus == WorkflowStatus.In_Transit ? "bi-truck" :
+                           req.WorkflowStatus == WorkflowStatus.Delivered ? "bi-box-seam" : "bi-archive";
+                <tr @(req.WorkflowStatus == WorkflowStatus.In_Transit && req.RequesterID == currentUserId ? "class=table-warning" : "")>
+                    <td><code class="small">REQ-@req.ID.ToString("D4")</code></td>
+                    <td>
+                        <div class="fw-semibold">@req.Item?.ItemName</div>
+                        <small class="text-muted">@req.Requester?.FullName</small>
+                    </td>
+                    <td class="small">@req.Item?.Vendor?.CompanyName</td>
+                    <td>@req.Quantity</td>
+                    <td class="fw-bold text-primary">&#8369;@req.TotalCalculatedAmount.ToString("N2")</td>
+                    <td>
+                        @if (req.IsEncumbered) { <span class="badge bg-success"><i class="bi bi-lock-fill me-1"></i>Locked</span> }
+                        else { <span class="badge bg-light text-dark border">Free</span> }
+                    </td>
+                    <td>
+                        <span class="status-badge @cls">
+                            <i class="bi @icon"></i>
+                            @req.WorkflowStatus.ToString().Replace("_", " ")
+                        </span>
+                    </td>
+                    <td class="small text-muted">@req.CreatedAt.ToString("dd MMM yyyy")</td>
+                    <td>
+                        @if (req.WorkflowStatus == WorkflowStatus.In_Transit && req.RequesterID == currentUserId)
+                        {
+                        <form asp-controller="Catalog" asp-action="MarkDelivered" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@req.ID" />
+                            <button type="submit" class="btn-approve btn btn-sm fw-semibold"
+                                    onclick="return confirm('Confirm material receipt for REQ-@req.ID.ToString("D4")? You will be required to complete a mandatory evaluation.')">
+                                <i class="bi bi-box-seam me-1"></i>Confirm Receipt
+                            </button>
+                        </form>
+                        }
+                        else if (req.WorkflowStatus == WorkflowStatus.Delivered && req.Evaluation == null && req.RequesterID == currentUserId)
+                        {
+                        <a asp-controller="Evaluation" asp-action="Submit"
+                           asp-route-requisitionId="@req.ID"
+                           class="btn btn-sm btn-warning fw-semibold">
+                            <i class="bi bi-star me-1"></i>Pending Evaluation
+                        </a>
+                        }
+                        else if (req.Evaluation != null)
+                        {
+                        <span class="text-success small"><i class="bi bi-check-circle-fill me-1"></i>Reviewed</span>
+                        }
+                        else if (isInternal && req.WorkflowStatus == WorkflowStatus.In_Transit)
+                        {
+                        <form asp-controller="Catalog" asp-action="MarkDelivered" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@req.ID" />
+                            <button type="submit" class="btn-approve btn btn-sm">
+                                <i class="bi bi-check-lg me-1"></i>Mark Delivered
+                            </button>
+                        </form>
+                        }
+                        else
+                        {
+                        <span class="text-muted small">—</span>
+                        }
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+}

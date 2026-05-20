@@ -1,0 +1,73 @@
+@model ProVMSIT15.Models.ViewModels.LoginViewModel
+@{ ViewData["Title"] = "Sign In"; Layout = "_Layout"; }
+
+<div class="min-vh-100 d-flex align-items-center justify-content-center" style="background: linear-gradient(135deg, #0f1c33 0%, #1e3a5f 50%, #2563eb 100%);">
+    <div class="col-12 col-sm-8 col-md-5 col-lg-4 px-3">
+        <div class="text-center mb-4">
+            <div class="mb-3"><i class="bi bi-box-seam-fill text-warning" style="font-size:3rem"></i></div>
+            <h2 class="text-white fw-bold mb-1">ProVMS</h2>
+            <p class="text-light opacity-75">Procurement & Vendor Management</p>
+        </div>
+        <div class="card border-0 shadow-lg" style="border-radius:16px">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4 text-center" style="color:#1a2b4a">Sign In to Your Account</h5>
+                <form asp-controller="Auth" asp-action="Login" method="post">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label fw-semibold small">Email Address</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
+                            <input asp-for="Email" class="form-control border-start-0 ps-0" placeholder="you@company.com" />
+                        </div>
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Password" class="form-label fw-semibold small">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
+                            <input asp-for="Password" class="form-control border-start-0 ps-0" placeholder="••••••••" id="pwField" />
+                            <button class="btn btn-light border border-start-0" type="button" onclick="togglePw()">
+                                <i class="bi bi-eye" id="pwEye"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-4 d-flex align-items-center justify-content-between">
+                        <div class="form-check">
+                            <input asp-for="RememberMe" class="form-check-input" />
+                            <label asp-for="RememberMe" class="form-check-label small">Remember me</label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn w-100 fw-bold py-2" style="background:#1a2b4a;color:white;border-radius:8px">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                    </button>
+                </form>
+                <hr class="my-3">
+                <div class="text-center">
+                    <p class="small text-muted mb-2">Are you a vendor applying for accreditation?</p>
+                    <a asp-controller="Vendor" asp-action="Onboarding" class="btn btn-outline-warning btn-sm w-100 fw-semibold">
+                        <i class="bi bi-building-add me-2"></i>Vendor Registration Wizard
+                    </a>
+                </div>
+                <div class="text-center mt-3">
+                    <p class="small text-muted mb-0">
+                        <i class="bi bi-shield-lock me-1"></i>
+                        Internal staff accounts are provisioned by the System Administrator only.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function togglePw() {
+    const f = document.getElementById('pwField');
+    const e = document.getElementById('pwEye');
+    if (f.type === 'password') { f.type = 'text'; e.className = 'bi bi-eye-slash'; }
+    else { f.type = 'password'; e.className = 'bi bi-eye'; }
+}
+</script>
+}

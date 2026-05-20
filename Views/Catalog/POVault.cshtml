@@ -1,0 +1,120 @@
+@model IEnumerable<ProVMSIT15.Models.PurchaseRequisition>
+@{
+    ViewData["Title"] = "Purchase Orders";
+    ViewData["BreadcrumbModule"] = "Purchase Requisition";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-file-earmark-ruled fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Purchase Order Vault</h4>
+            <small class="opacity-75">Manage, issue, and download official POs &mdash; Vendor SLA tracked at 72h</small>
+        </div>
+    </div>
+</div>
+
+    @if (!Model.Any())
+    {
+        <div class="provms-card">
+            <div class="provms-empty-state">
+                <i class="bi bi-file-earmark-ruled empty-icon"></i>
+                <h5>No Purchase Orders Found</h5>
+                <p>Purchase orders will appear here once requisitions are approved and POs are issued.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="provms-card p-0">
+            <div class="card-section-header">
+                <i class="bi bi-file-earmark-ruled text-primary"></i>
+                <h6>Active Purchase Orders</h6>
+                <span class="badge ms-auto" style="background:#dbeafe;color:#1e40af">@Model.Count() Records</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover provms-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>PO Number</th>
+                            <th>Requester</th>
+                            <th>Item</th>
+                            <th>Vendor</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Vendor SLA (72h)</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var req in Model)
+                        {
+                            var cls = req.WorkflowStatus == WorkflowStatus.Delivered ? "badge-delivered" :
+                                      req.WorkflowStatus == WorkflowStatus.Archived ? "badge-archived" : "badge-workflow";
+                            var icon = req.WorkflowStatus == WorkflowStatus.Approved_Budget ? "bi-check-circle" :
+                                       req.WorkflowStatus == WorkflowStatus.PO_Issued ? "bi-file-text" :
+                                       req.WorkflowStatus == WorkflowStatus.In_Transit ? "bi-truck" :
+                                       req.WorkflowStatus == WorkflowStatus.Delivered ? "bi-box-seam" : "bi-archive";
+                            <tr>
+                                <td><code class="fw-bold">PO-@req.ID.ToString("D6")</code></td>
+                                <td>@req.Requester?.FullName</td>
+                                <td>@req.Item?.ItemName</td>
+                                <td class="small">@req.Item?.Vendor?.CompanyName</td>
+                                <td class="fw-bold text-primary">&#8369;@req.TotalCalculatedAmount.ToString("N2")</td>
+                                <td>
+                                    <span class="status-badge @cls">
+                                        <i class="bi @icon"></i>
+                                        @req.WorkflowStatus.ToString().Replace("_", " ")
+                                    </span>
+                                </td>
+                                @{ var slHrs = req.POIssuedAt.HasValue ? (DateTime.UtcNow - req.POIssuedAt.Value).TotalHours : 0;
+                                   bool showSla = req.WorkflowStatus == WorkflowStatus.PO_Issued || req.WorkflowStatus == WorkflowStatus.In_Transit; }
+                                <td>
+                                    @if (showSla)
+                                    {
+                                        if (slHrs > 72)
+                                        { <span class="sla-breach"><i class="bi bi-alarm"></i>BREACH @((int)slHrs)h</span> }
+                                        else if (slHrs > 48)
+                                        { <span class="sla-warn"><i class="bi bi-clock"></i>@((int)slHrs)h / 72h</span> }
+                                        else
+                                        { <span class="sla-ok"><i class="bi bi-check-circle"></i>@((int)slHrs)h / 72h</span> }
+                                    }
+                                    else { <span class="text-muted small">—</span> }
+                                </td>
+                                <td class="small text-muted">@req.CreatedAt.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    <div class="d-flex gap-1 flex-wrap">
+                                        <a asp-controller="Catalog" asp-action="DownloadPO" asp-route-id="@req.ID"
+                                           class="btn btn-sm btn-outline-danger" title="Download PDF">
+                                            <i class="bi bi-file-earmark-pdf"></i>
+                                        </a>
+                                        @if (req.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.Approved_Budget)
+                                        {
+                                            <form asp-controller="Catalog" asp-action="IssuePO" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@req.ID" />
+                                                <button type="submit" class="btn btn-sm btn-primary fw-semibold">
+                                                    <i class="bi bi-send me-1"></i>Issue PO
+                                                </button>
+                                            </form>
+                                        }
+                                        @if (req.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.In_Transit)
+                                        {
+                                            <form asp-controller="Catalog" asp-action="MarkDelivered" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@req.ID" />
+                                                <button type="submit" class="btn btn-sm btn-success fw-semibold"
+                                                        onclick="return confirm('Mark as Delivered?')">
+                                                    <i class="bi bi-box-seam me-1"></i>Delivered
+                                                </button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }

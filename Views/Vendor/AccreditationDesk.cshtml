@@ -1,0 +1,134 @@
+@model IEnumerable<ProVMSIT15.Models.Vendor>
+@{
+    ViewData["Title"] = "Accreditation Process";
+    ViewData["BreadcrumbModule"] = "Vendor Accreditation";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-clipboard2-check fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Accreditation Process</h4>
+            <small class="opacity-75">Interactive validation center  approve or reject incoming vendor registrations</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Awaiting Review</div><div class="stat-value mt-1">@Model.Count()</div></div>
+                <i class="bi bi-inbox stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Docs Uploaded</div><div class="stat-value mt-1">@Model.Count(v => v.DocumentVaultURL != null)</div></div>
+                <i class="bi bi-file-earmark-check stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Missing Docs</div><div class="stat-value mt-1">@Model.Count(v => v.DocumentVaultURL == null)</div></div>
+                <i class="bi bi-file-earmark-x stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+<div class="provms-card">
+    <div class="provms-empty-state">
+        <i class="bi bi-check-circle-fill empty-icon" style="color:#059669"></i>
+        <h5>Queue Cleared</h5>
+        <p>All vendor registrations have been reviewed. No pending accreditations at this time.</p>
+        <a asp-controller="Vendor" asp-action="Directory" class="btn btn-outline-primary btn-sm"><i class="bi bi-grid-3x2-gap me-2"></i>View Vendor Directory</a>
+    </div>
+</div>
+}
+else
+{
+<div class="provms-card p-0">
+    <div class="card-section-header">
+        <i class="bi bi-shield-check text-warning"></i>
+        <h6>Pending Accreditation Queue</h6>
+        <span class="badge ms-auto" style="background:#fef3c7;color:#92400e">@Model.Count() Pending</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>Company</th>
+                    <th>Tax ID</th>
+                    <th>Contact Email</th>
+                    <th>Registered By</th>
+                    <th>Documents</th>
+                    <th>Submitted</th>
+                    <th>SLA (48h)</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var v in Model)
+                {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@v.CompanyName</div>
+                        <small class="text-muted">@(v.Items.Any() ? v.Items.First().Category.ToString().Replace("_"," ") : "General")</small>
+                    </td>
+                    <td><code class="small">@v.TaxID</code></td>
+                    <td class="small">@v.ContactEmail</td>
+                    <td class="small">@(v.LinkedUser?.FullName ?? "")</td>
+                    <td>
+                        @if (v.DocumentVaultURL != null)
+                        {
+                        <a href="@v.DocumentVaultURL" target="_blank" class="btn-verify btn btn-sm">
+                            <i class="bi bi-file-earmark-pdf me-1"></i>Verify Docs
+                        </a>
+                        }
+                        else
+                        {
+                        <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Not Uploaded</span>
+                        }
+                    </td>
+                    <td class="small">@v.SubmittedAt.ToString("MMM dd, yyyy HH:mm")</td>
+                    @{ var hoursWaiting = (DateTime.UtcNow - v.SubmittedAt).TotalHours; }
+                    <td>
+                        @if (hoursWaiting > 48)
+                        { <span class="sla-breach"><i class="bi bi-alarm"></i>BREACH @((int)hoursWaiting)h</span> }
+                        else if (hoursWaiting > 36)
+                        { <span class="sla-warn"><i class="bi bi-clock"></i>@((int)hoursWaiting)h / 48h</span> }
+                        else
+                        { <span class="sla-ok"><i class="bi bi-check-circle"></i>@((int)hoursWaiting)h / 48h</span> }
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex justify-content-center gap-2">
+                            <form asp-controller="Vendor" asp-action="ApproveVendor" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@v.ID" />
+                                <button type="submit" class="btn-approve btn btn-sm">
+                                    <i class="bi bi-check-lg me-1"></i>&#x2713; Approve
+                                </button>
+                            </form>
+                            <form asp-controller="Vendor" asp-action="RejectVendor" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@v.ID" />
+                                <button type="submit" class="btn-reject btn btn-sm">
+                                    <i class="bi bi-x-lg me-1"></i>&#x2715; Reject
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+}
+

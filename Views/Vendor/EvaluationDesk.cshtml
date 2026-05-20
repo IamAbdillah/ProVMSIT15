@@ -1,0 +1,106 @@
+@model List<ProVMSIT15.Models.SupplierEvaluation>
+@{
+    ViewData["Title"] = "Vendor Evaluation";
+    ViewData["BreadcrumbModule"] = "Vendor Accreditation";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-star-half fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Vendor Evaluation</h4>
+            <small class="opacity-75">Supplier performance ratings &amp; review records</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Total Reviews</div>
+                    <div class="stat-value mt-1">@Model.Count</div>
+                </div>
+                <i class="bi bi-clipboard-data stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Top Rated (4.5+)</div>
+                    <div class="stat-value mt-1">@Model.Count(e => (e.DeliverySpeedStars + e.ItemConditionStars + e.CommunicationStars) / 3.0 >= 4.5)</div>
+                </div>
+                <i class="bi bi-star-fill stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Avg Score</div>
+                    <div class="stat-value mt-1">@(Model.Any() ? (Model.Average(e => (e.DeliverySpeedStars + e.ItemConditionStars + e.CommunicationStars) / 3.0)).ToString("F1") : "—")</div>
+                </div>
+                <i class="bi bi-speedometer stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card red">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Critical (&lt;2.5)</div>
+                    <div class="stat-value mt-1">@Model.Count(e => (e.DeliverySpeedStars + e.ItemConditionStars + e.CommunicationStars) / 3.0 < 2.5)</div>
+                </div>
+                <i class="bi bi-exclamation-triangle stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-0">
+    <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+        <h6 class="fw-bold mb-0"><i class="bi bi-table me-2 text-primary"></i>Evaluation Records</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Vendor</th>
+                    <th>Item</th>
+                    <th>Delivery</th>
+                    <th>Condition</th>
+                    <th>Communication</th>
+                    <th>Overall</th>
+                    <th>Comments</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                <tr><td colspan="9" class="text-center text-muted py-4">No evaluation records yet.</td></tr>
+                }
+                @foreach (var e in Model)
+                {
+                var overall = (e.DeliverySpeedStars + e.ItemConditionStars + e.CommunicationStars) / 3.0;
+                var cls = overall >= 4.5 ? "badge-active" : overall < 2.5 ? "badge-suspended" : "badge-workflow";
+                <tr>
+                    <td><code class="small">EVL-@e.ID.ToString("D4")</code></td>
+                    <td class="fw-semibold">@(e.Vendor?.CompanyName ?? "—")</td>
+                    <td class="small">@(e.Requisition?.Item?.ItemName ?? "—")</td>
+                    <td>@for (int i = 1; i <= 5; i++) { <i class="bi @(i <= e.DeliverySpeedStars ? "bi-star-fill text-warning" : "bi-star text-muted")" style="font-size:.75rem"></i> }</td>
+                    <td>@for (int i = 1; i <= 5; i++) { <i class="bi @(i <= e.ItemConditionStars ? "bi-star-fill text-warning" : "bi-star text-muted")" style="font-size:.75rem"></i> }</td>
+                    <td>@for (int i = 1; i <= 5; i++) { <i class="bi @(i <= e.CommunicationStars ? "bi-star-fill text-warning" : "bi-star text-muted")" style="font-size:.75rem"></i> }</td>
+                    <td><span class="status-badge @cls">@overall.ToString("F1")/5</span></td>
+                    <td class="small text-muted">@(e.PerformanceComments ?? "—")</td>
+                    <td class="small">@e.CreatedDate.ToString("MMM dd, yyyy")</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

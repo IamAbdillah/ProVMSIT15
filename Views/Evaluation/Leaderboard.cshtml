@@ -1,0 +1,124 @@
+@model IEnumerable<VendorScoreModel>
+@using ProVMSIT15.Controllers
+@{ ViewData["Title"] = "Performance Leaderboard"; Layout = "_Layout"; }
+
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-trophy fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Vendor Performance Leaderboard</h4>
+            <small class="opacity-75">Aggregated supplier evaluation scores and rankings</small>
+        </div>
+    </div>
+</div>
+
+    @if (!Model.Any())
+    {
+        <div class="provms-card">
+            <div class="provms-empty-state">
+                <i class="bi bi-trophy empty-icon"></i>
+                <h5>No Evaluations Yet</h5>
+                <p>Vendor leaderboard data will populate once orders are delivered and evaluated.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @{
+                var ranked = Model.ToList();
+                for (int i = 0; i < Math.Min(3, ranked.Count); i++)
+                {
+                    var v = ranked[i];
+                    var medals = new[] { ("bg-warning text-dark", "bi-trophy-fill", "1st"), ("text-white", "bi-award-fill", "2nd"), ("text-white", "bi-award", "3rd") };
+                    var bgClasses = new[] { "blue", "purple", "amber" };
+                    <div class="col-md-4">
+                        <div class="provms-stat-card @bgClasses[i] text-center">
+                            <i class="bi @medals[i].Item2 fs-2 mb-2 d-block"></i>
+                            <div class="small opacity-75">@medals[i].Item3 Place</div>
+                            <div class="fw-bold fs-5 mt-1">@v.CompanyName</div>
+                            <div class="fs-2 fw-bold mt-2">@v.OverallAverage.ToString("F1")<span class="fs-6">/5</span></div>
+                            <div class="small opacity-75 mt-1">@v.EvaluationCount evaluation@(v.EvaluationCount!=1?"s":"")</div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        <div class="provms-card mt-4 p-0">
+            <div class="card-section-header">
+                <i class="bi bi-list-ol text-primary"></i>
+                <h6>Full Rankings</h6>
+                <span class="badge ms-auto" style="background:#dbeafe;color:#1e40af">@Model.Count() vendors</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover provms-table mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:50px">Rank</th>
+                            <th>Vendor</th>
+                            <th>Evaluations</th>
+                            <th><i class="bi bi-lightning-charge me-1 text-warning"></i>Delivery</th>
+                            <th><i class="bi bi-box-seam me-1 text-primary"></i>Condition</th>
+                            <th><i class="bi bi-chat-dots me-1 text-info"></i>Communication</th>
+                            <th>Overall</th>
+                            <th>Flag</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int rank = 1; }
+                        @foreach (var v in Model)
+                        {
+                            <tr class="@(v.OverallAverage < 2.5 ? "table-danger" : "")">
+                                <td class="fw-bold text-center">
+                                    @if (rank == 1) { <i class="bi bi-trophy-fill text-warning"></i> }
+                                    else { <span>@rank</span> }
+                                </td>
+                                <td class="fw-semibold">@v.CompanyName</td>
+                                <td><span class="badge bg-secondary">@v.EvaluationCount</span></td>
+                                <td>@renderStars(v.AvgDelivery)</td>
+                                <td>@renderStars(v.AvgCondition)</td>
+                                <td>@renderStars(v.AvgCommunication)</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height:8px">
+                                            <div class="progress-bar @(v.OverallAverage >= 4 ? "bg-success" : v.OverallAverage >= 2.5 ? "bg-warning" : "bg-danger")"
+                                                 style="width:@((v.OverallAverage/5.0*100).ToString("F0"))%"></div>
+                                        </div>
+                                        <span class="fw-bold small">@v.OverallAverage.ToString("F1")</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (v.OverallAverage < 2.5)
+                                    {
+                                        <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Low</span>
+                                    }
+                                    else if (v.OverallAverage >= 4.5)
+                                    {
+                                        <span class="badge bg-success"><i class="bi bi-award me-1"></i>Top</span>
+                                    }
+                                </td>
+                            </tr>
+                            rank++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+@functions {
+    IHtmlContent renderStars(double score)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<span class='text-warning'>");
+        for (int s = 1; s <= 5; s++)
+        {
+            sb.Append(s <= Math.Round(score)
+                ? "<i class='bi bi-star-fill'></i>"
+                : "<i class='bi bi-star'></i>");
+        }
+        sb.Append("</span> <small class='text-muted'>(" + score.ToString("F1") + ")</small>");
+        return new Microsoft.AspNetCore.Html.HtmlString(sb.ToString());
+    }
+}

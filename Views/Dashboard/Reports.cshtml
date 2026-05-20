@@ -1,0 +1,135 @@
+@{
+    ViewData["Title"] = "Reports & Insights";
+    ViewData["BreadcrumbModule"] = "Procurement Analytics";
+    var totalSpend = (decimal)(ViewBag.TotalSpend ?? 0m);
+    var totalPOs = (int)(ViewBag.TotalPOs ?? 0);
+    var activeVendors = (int)(ViewBag.ActiveVendors ?? 0);
+    var avgScore = (double)(ViewBag.AvgScore ?? 0.0);
+    var catLabels = (List<string>)(ViewBag.CategoryLabels ?? new List<string>());
+    var catValues = (List<decimal>)(ViewBag.CategoryValues ?? new List<decimal>());
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-file-bar-graph fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Reports &amp; Insights</h4>
+            <small class="opacity-75">Procurement analytics and operational intelligence</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Spend (YTD)</div><div class="stat-value mt-1" style="font-size:1.3rem">₱@totalSpend.ToString("N0")</div></div>
+                <i class="bi bi-currency-exchange stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Purchase Orders</div><div class="stat-value mt-1">@totalPOs</div></div>
+                <i class="bi bi-file-earmark-text stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card teal">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Active Vendors</div><div class="stat-value mt-1">@activeVendors</div></div>
+                <i class="bi bi-building-check stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Avg Supplier Score</div><div class="stat-value mt-1">@avgScore.ToString("F1")</div></div>
+                <i class="bi bi-star-fill stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <i class="bi bi-pie-chart-fill text-primary"></i>
+                <h6>Spend by Category</h6>
+            </div>
+            <canvas id="categoryChart"></canvas>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <i class="bi bi-bar-chart-fill text-success"></i>
+                <h6>Spend Distribution</h6>
+            </div>
+            <canvas id="spendBar"></canvas>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="provms-card p-0">
+            <div class="card-section-header">
+                <i class="bi bi-table text-primary"></i>
+                <h6>Category Breakdown</h6>
+            </div>
+            <div class="p-4">
+            <div class="table-responsive">
+                <table class="table provms-table mb-0">
+                    <thead>
+                        <tr><th>Category</th><th>Total Spend</th><th>% of Total</th><th>Spend Bar</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (!catLabels.Any())
+                        {
+                        <tr><td colspan="4"><div class="provms-empty-state" style="padding:2rem"><i class="bi bi-bar-chart empty-icon"></i><h5>No Spend Data</h5><p>Analytics will populate once purchase orders are processed.</p></div></td></tr>
+                        }
+                        @for (int i = 0; i < catLabels.Count; i++)
+                        {
+                        var pct = totalSpend > 0 ? (int)(catValues[i] / totalSpend * 100) : 0;
+                        <tr>
+                            <td class="fw-semibold">@catLabels[i].Replace("_", " ")</td>
+                            <td class="fw-bold text-primary">₱@catValues[i].ToString("N2")</td>
+                            <td>@pct%</td>
+                            <td style="min-width:150px">
+                                <div class="progress" style="height:8px;border-radius:4px">
+                                    <div class="progress-bar bg-primary" style="width:@pct%"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const catLabels = [@Html.Raw(string.Join(",", catLabels.Select(l => $"'{l.Replace("_"," ")}'")))];
+const catValues = [@string.Join(",", catValues.Select(v => v.ToString("F2")))];
+new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+        labels: catLabels,
+        datasets: [{ data: catValues, backgroundColor: ['#2563eb','#059669','#d97706','#7c3aed','#dc2626'], borderWidth: 2 }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+new Chart(document.getElementById('spendBar'), {
+    type: 'bar',
+    data: {
+        labels: catLabels,
+        datasets: [{ label: 'Spend (₱)', data: catValues, backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 6 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+});
+</script>
+}

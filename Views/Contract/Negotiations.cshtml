@@ -1,0 +1,107 @@
+@model List<ProVMSIT15.Models.Contract>
+@{
+    ViewData["Title"] = "Negotiations";
+    ViewData["BreadcrumbModule"] = "Contract Management";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-people fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Negotiations</h4>
+            <small class="opacity-75">Active negotiation threads &amp; draft contract workspace</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Under Negotiation</div><div class="stat-value mt-1">@Model.Count(c => c.Status == ProVMSIT15.Models.ContractStatus.UnderNegotiation)</div></div>
+                <i class="bi bi-chat-dots stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Draft Contracts</div><div class="stat-value mt-1">@Model.Count(c => c.Status == ProVMSIT15.Models.ContractStatus.Draft)</div></div>
+                <i class="bi bi-file-earmark-text stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Pipeline Value</div><div class="stat-value mt-1" style="font-size:1.1rem">₱@Model.Sum(c => c.TotalValue).ToString("N0")</div></div>
+                <i class="bi bi-currency-exchange stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card purple">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Avg Discount</div><div class="stat-value mt-1">@(Model.Any() ? Model.Average(c => c.DiscountPercent).ToString("F1") : "0")%</div></div>
+                <i class="bi bi-percent stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-0">
+    <div class="px-4 py-3 border-bottom d-flex align-items-center gap-2">
+        <i class="bi bi-handshake text-primary"></i>
+        <h6 class="fw-bold mb-0">Active Negotiation Console</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>Contract ID</th>
+                    <th>Title</th>
+                    <th>Vendor</th>
+                    <th>Value</th>
+                    <th>Discount</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                <tr><td colspan="8" class="text-center text-muted py-4"><i class="bi bi-chat-left-dots fs-3 d-block mb-2"></i>No active negotiations.</td></tr>
+                }
+                @foreach (var c in Model)
+                {
+                var statusCls = c.Status == ProVMSIT15.Models.ContractStatus.UnderNegotiation ? "badge-negotiation" : "badge-draft";
+                <tr>
+                    <td><code class="small">CON-@c.ID.ToString("D4")</code></td>
+                    <td class="fw-semibold">@c.ContractTitle</td>
+                    <td>@c.Vendor?.CompanyName</td>
+                    <td class="fw-bold text-primary">₱@c.TotalValue.ToString("N2")</td>
+                    <td><span class="badge bg-warning text-dark">@c.DiscountPercent%</span></td>
+                    <td><span class="status-badge @statusCls">@c.Status</span></td>
+                    <td class="small text-muted" style="max-width:180px">
+                        <span class="text-truncate d-inline-block" style="max-width:160px" title="@c.NegotiationNotes">@(c.NegotiationNotes ?? "—")</span>
+                    </td>
+                    <td>
+                        <form asp-action="UpdateStatus" method="post" class="d-flex gap-1">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@c.ID" />
+                            <input type="hidden" name="status" value="@ProVMSIT15.Models.ContractStatus.Active" />
+                            <button class="btn-approve btn btn-sm"><i class="bi bi-check-lg me-1"></i>Finalize</button>
+                        </form>
+                        <form asp-action="UpdateStatus" method="post" class="d-flex gap-1 mt-1">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@c.ID" />
+                            <input type="hidden" name="status" value="@ProVMSIT15.Models.ContractStatus.Terminated" />
+                            <button class="btn-reject btn btn-sm"><i class="bi bi-x-lg me-1"></i>Terminate</button>
+                        </form>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

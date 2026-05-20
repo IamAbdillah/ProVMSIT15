@@ -1,0 +1,152 @@
+@model IEnumerable<ProVMSIT15.Models.Vendor>
+@{
+    ViewData["Title"] = "Vendor Management";
+    ViewData["BreadcrumbModule"] = "Vendor Accreditation";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-grid-3x2-gap fs-3"></i>
+            <div>
+                <h4 class="mb-0 fw-bold">Vendor Management</h4>
+                <small class="opacity-75">Browse, search and manage all registered supplier records</small>
+            </div>
+        </div>
+        @if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
+        {
+        <a class="btn btn-warning fw-semibold" asp-controller="Vendor" asp-action="Onboarding">
+            <i class="bi bi-plus-circle me-1"></i>Onboard Vendor
+        </a>
+        }
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Active Vendors</div><div class="stat-value mt-1">@Model.Count(v => v.OperationalStatus == ProVMSIT15.Models.OperationalStatus.Active)</div></div>
+                <i class="bi bi-building-check stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Pending Approval</div><div class="stat-value mt-1">@Model.Count(v => v.OperationalStatus == ProVMSIT15.Models.OperationalStatus.PendingVerification)</div></div>
+                <i class="bi bi-hourglass-split stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Top Rated 4.5+</div><div class="stat-value mt-1">@ViewBag.TopRated</div></div>
+                <i class="bi bi-star-fill stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card red">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Under Review</div><div class="stat-value mt-1">@Model.Count(v => v.OperationalStatus == ProVMSIT15.Models.OperationalStatus.Suspended)</div></div>
+                <i class="bi bi-eye stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-3 mb-4">
+    <form method="get" asp-controller="Vendor" asp-action="Directory" class="row g-2 align-items-end">
+        <div class="col-md-5">
+            <label class="form-label small fw-semibold">Search</label>
+            <input type="text" name="search" value="@ViewBag.Search" class="form-control"
+                   placeholder="Company name or email..." />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Status Filter</label>
+            @{ string st = ViewBag.Status ?? ""; }
+            <select name="status" class="form-select">
+                <option value="">All Statuses</option>
+                @if (st == "PendingVerification") { <option value="PendingVerification" selected>Pending Verification</option> }
+                else { <option value="PendingVerification">Pending Verification</option> }
+                @if (st == "Active") { <option value="Active" selected>Active</option> }
+                else { <option value="Active">Active</option> }
+                @if (st == "Suspended") { <option value="Suspended" selected>Suspended</option> }
+                else { <option value="Suspended">Suspended</option> }
+                @if (st == "Blacklisted") { <option value="Blacklisted" selected>Blacklisted</option> }
+                else { <option value="Blacklisted">Blacklisted</option> }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Filter</button>
+        </div>
+        <div class="col-md-2">
+            <a asp-controller="Vendor" asp-action="Directory" class="btn btn-outline-secondary w-100">Reset</a>
+        </div>
+    </form>
+</div>
+
+<div class="provms-card p-0">
+    <div class="card-section-header">
+        <i class="bi bi-table text-primary"></i>
+        <h6>Vendor Records</h6>
+        <span class="badge ms-auto" style="background:#dbeafe;color:#1e40af">@Model.Count() vendors</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>Company</th>
+                    <th>Contact Person</th>
+                    <th>Email</th>
+                    <th>Tax ID</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                <tr>
+                    <td colspan="8">
+                        <div class="provms-empty-state" style="padding:2.5rem">
+                            <i class="bi bi-building-x empty-icon"></i>
+                            <h5>No Vendors Found</h5>
+                            <p>No vendor records match the current search or filter criteria.</p>
+                        </div>
+                    </td>
+                </tr>
+                }
+                @foreach (var v in Model)
+                {
+                var statusCls = v.OperationalStatus switch {
+                    ProVMSIT15.Models.OperationalStatus.Active => "badge-active",
+                    ProVMSIT15.Models.OperationalStatus.PendingVerification => "badge-pending",
+                    ProVMSIT15.Models.OperationalStatus.Suspended => "badge-suspended",
+                    _ => "badge-blacklisted"
+                };
+                var catIcon = v.Items.Any() ? v.Items.First().Category.ToString().Replace("_"," ") : "";
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@v.CompanyName</div>
+                        <small class="text-muted">@v.TaxID</small>
+                    </td>
+                    <td>@(v.LinkedUser?.FullName ?? "")</td>
+                    <td class="small">@v.ContactEmail</td>
+                    <td><code class="small">@v.TaxID</code></td>
+                    <td class="small">@catIcon</td>
+                    <td><span class="status-badge @statusCls">@v.OperationalStatus.ToString().Replace("PendingVerification","Pending Verification")</span></td>
+                    <td class="small">@v.UpdatedAt.ToString("MMM dd, yyyy")</td>
+                    <td>
+                        <a asp-controller="Vendor" asp-action="Profile" asp-route-id="@v.ID"
+                           class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

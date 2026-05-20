@@ -1,0 +1,137 @@
+@model List<VendorScoreModel>
+@using ProVMSIT15.Controllers
+@{
+    ViewData["Title"] = "Performance Evaluation";
+    ViewData["BreadcrumbModule"] = "Supplier Evaluation";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-bar-chart-steps fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Performance Evaluation</h4>
+            <small class="opacity-75">Analytics grid aggregating star ratings across supplier categories</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Top-Tier Vendors (85+)</div>
+                    <div class="stat-value mt-1">@Model.Count(v => v.OverallAverage >= 4.25)</div>
+                </div>
+                <i class="bi bi-trophy stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Pending Reviews</div>
+                    <div class="stat-value mt-1">@Model.Count(v => v.EvaluationCount == 0)</div>
+                </div>
+                <i class="bi bi-hourglass-split stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">YTD Average Score</div>
+                    <div class="stat-value mt-1">@(Model.Any() ? (Model.Average(v => v.OverallAverage) * 20).ToString("F0") : "—")</div>
+                </div>
+                <i class="bi bi-speedometer2 stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card red">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Critical Suppliers</div>
+                    <div class="stat-value mt-1">@Model.Count(v => v.OverallAverage < 2.5)</div>
+                </div>
+                <i class="bi bi-exclamation-octagon stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-0">
+    <div class="card-section-header">
+        <i class="bi bi-list-ol text-primary"></i>
+        <h6>Vendor Performance Leaderboard</h6>
+        <span class="badge ms-auto" style="background:#dbeafe;color:#1e40af">@Model.Count() vendors</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Vendor</th>
+                    <th>Reviews</th>
+                    <th>Delivery Speed</th>
+                    <th>Item Condition</th>
+                    <th>Communication</th>
+                    <th>Overall Score</th>
+                    <th>Rating Bar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                <tr>
+                    <td colspan="8">
+                        <div class="provms-empty-state" style="padding:2.5rem">
+                            <i class="bi bi-star empty-icon"></i>
+                            <h5>No Evaluations Yet</h5>
+                            <p>Performance data will appear once requisitions are delivered and evaluated.</p>
+                        </div>
+                    </td>
+                </tr>
+                }
+                @{int rank = 1;}
+                @foreach (var v in Model)
+                {
+                var pct = (int)(v.OverallAverage / 5.0 * 100);
+                var barColor = pct >= 85 ? "bg-success" : pct >= 60 ? "bg-warning" : "bg-danger";
+                var badgeCls = pct >= 85 ? "badge-active" : pct < 50 ? "badge-suspended" : "badge-workflow";
+                <tr>
+                    <td>
+                        @if (rank == 1) { <i class="bi bi-trophy-fill text-warning"></i> }
+                        else if (rank == 2) { <i class="bi bi-trophy-fill text-secondary"></i> }
+                        else if (rank == 3) { <i class="bi bi-trophy-fill" style="color:#cd7f32"></i> }
+                        else { <span class="text-muted">#@rank</span> }
+                    </td>
+                    <td class="fw-semibold">@v.CompanyName</td>
+                    <td><span class="badge bg-secondary">@v.EvaluationCount</span></td>
+                    <td>
+                        @for (int i = 1; i <= 5; i++) { <i class="bi @(i <= Math.Round(v.AvgDelivery) ? "bi-star-fill text-warning" : "bi-star text-muted")" style="font-size:.8rem"></i> }
+                        <span class="ms-1 small text-muted">@v.AvgDelivery.ToString("F1")</span>
+                    </td>
+                    <td>
+                        @for (int i = 1; i <= 5; i++) { <i class="bi @(i <= Math.Round(v.AvgCondition) ? "bi-star-fill text-warning" : "bi-star text-muted")" style="font-size:.8rem"></i> }
+                        <span class="ms-1 small text-muted">@v.AvgCondition.ToString("F1")</span>
+                    </td>
+                    <td>
+                        @for (int i = 1; i <= 5; i++) { <i class="bi @(i <= Math.Round(v.AvgCommunication) ? "bi-star-fill text-warning" : "bi-star text-muted")" style="font-size:.8rem"></i> }
+                        <span class="ms-1 small text-muted">@v.AvgCommunication.ToString("F1")</span>
+                    </td>
+                    <td><span class="status-badge @badgeCls">@v.OverallAverage.ToString("F2") / 5.0</span></td>
+                    <td style="min-width:120px">
+                        <div class="progress" style="height:8px;border-radius:4px">
+                            <div class="progress-bar @barColor" style="width:@pct%"></div>
+                        </div>
+                        <small class="text-muted">@pct%</small>
+                    </td>
+                </tr>
+                rank++;
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

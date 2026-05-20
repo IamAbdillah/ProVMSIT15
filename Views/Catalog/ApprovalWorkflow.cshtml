@@ -1,0 +1,105 @@
+@model IEnumerable<ProVMSIT15.Models.PurchaseRequisition>
+@{
+    ViewData["Title"] = "Approval Workflow";
+    ViewData["BreadcrumbModule"] = "Purchase Requisition";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-check2-square fs-3"></i>
+            <div>
+                <h4 class="mb-0 fw-bold">Approval Workflow</h4>
+                <small class="opacity-75">Secure clearance console  authorize or reject pending budget requests</small>
+            </div>
+        </div>
+        <span class="badge bg-warning text-dark fs-6 px-3 py-2">@Model.Count() Awaiting</span>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+<div class="provms-card">
+    <div class="provms-empty-state">
+        <i class="bi bi-check-all empty-icon" style="color:#059669"></i>
+        <h5>All Clear &mdash; No Pending Approvals</h5>
+        <p>All requisitions have been processed. New requests will appear here automatically.</p>
+    </div>
+</div>
+}
+else
+{
+<div class="provms-card p-0">
+    <div class="card-section-header">
+        <i class="bi bi-hourglass-split text-warning"></i>
+        <h6>Pending Authorization Requests</h6>
+        <span class="badge ms-auto" style="background:#fef3c7;color:#92400e">@Model.Count() Awaiting</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Item Name</th>
+                    <th>Submitted By</th>
+                    <th>Department</th>
+                    <th>Amount</th>
+                    <th>Encumbered</th>
+                    <th>SLA (24h)</th>
+                    <th>Submitted</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var req in Model)
+                {
+                var amount = req.TotalCalculatedAmount;
+                var priority = amount >= 50000 ? ("High", "badge bg-danger") : amount >= 20000 ? ("Medium", "badge bg-warning text-dark") : ("Low", "badge bg-secondary");
+                <tr>
+                    <td><span class="badge bg-primary">Vendor</span></td>
+                    <td>
+                        <div class="fw-semibold">@req.Item?.Vendor?.CompanyName</div>
+                        <small class="text-muted">@req.Item?.ItemName &middot; Qty: @req.Quantity</small>
+                    </td>
+                    <td>@req.Requester?.FullName</td>
+                    <td><span class="badge bg-light text-dark border">@(req.Requester?.DepartmentCode ?? "")</span></td>
+                    <td class="fw-bold text-primary">&#8369;@req.TotalCalculatedAmount.ToString("N2")</td>
+                    <td><span class="@priority.Item2">@priority.Item1</span></td>
+                    <td>
+                        @if (req.IsEncumbered) { <span class="badge bg-success"><i class="bi bi-lock-fill me-1"></i>Locked</span> }
+                        else { <span class="badge bg-secondary">No</span> }
+                    </td>
+                    @{ var hrs = req.FinanceSubmittedAt.HasValue ? (DateTime.UtcNow - req.FinanceSubmittedAt.Value).TotalHours : 0; }
+                    <td>
+                        @if (hrs > 24)
+                        { <span class="sla-breach"><i class="bi bi-alarm"></i>BREACH @((int)hrs)h</span> }
+                        else if (hrs > 18)
+                        { <span class="sla-warn"><i class="bi bi-clock"></i>@((int)hrs)h / 24h</span> }
+                        else
+                        { <span class="sla-ok"><i class="bi bi-check-circle"></i>@((int)hrs)h / 24h</span> }
+                    </td>
+                    <td class="small">@req.CreatedAt.ToString("MMM dd, yyyy")</td>
+                    <td class="text-center">
+                        <div class="d-flex justify-content-center gap-2">
+                            <form asp-controller="Catalog" asp-action="ApproveBudget" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@req.ID" />
+                                <button type="submit" class="btn-approve btn btn-sm">
+                                    <i class="bi bi-check-lg me-1"></i>Approve
+                                </button>
+                            </form>
+                            <form asp-controller="Catalog" asp-action="RejectRequisition" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@req.ID" />
+                                <button type="submit" class="btn-reject btn btn-sm">
+                                    <i class="bi bi-x-lg me-1"></i>Reject
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+}

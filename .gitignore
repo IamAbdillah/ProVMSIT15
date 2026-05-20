@@ -1,0 +1,43 @@
+## ASP.NET Core / .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+## Publish output
+publish/
+out/
+
+## Runtime / logs
+*.log
+*.tmp
+
+## Entity Framework migrations lock file
+*.db
+*.db-shm
+*.db-wal
+
+## Uploaded files (user-generated content)
+wwwroot/uploads/
+
+## dotnet secrets / local settings
+appsettings.Development.json
+secrets.json
+
+## OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## Rider / VS Code
+.idea/
+.vscode/
+*.ncrunch*
+
+## NuGet
+*.nupkg
+.nuget/
+packages/

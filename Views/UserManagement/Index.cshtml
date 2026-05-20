@@ -1,0 +1,132 @@
+@model List<ProVMSIT15.Models.AppUser>
+@{
+    ViewData["Title"] = "User Management";
+    ViewData["BreadcrumbModule"] = "User Management";
+    var roleOrder = new[] { "Admin", "Finance", "Procurement", "User" };
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-people-fill fs-3"></i>
+            <div>
+                <h4 class="mb-0 fw-bold">User Management</h4>
+                <small class="opacity-75">Internal identity provisioning &amp; role assignment console</small>
+            </div>
+        </div>
+        <a class="btn btn-warning fw-semibold" asp-action="Create">
+            <i class="bi bi-person-plus-fill me-1"></i>Provision New User
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Internal Users</div><div class="stat-value mt-1">@Model.Count</div></div>
+                <i class="bi bi-people stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card red">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Admins</div><div class="stat-value mt-1">@Model.Count(u => u.UserRole == ProVMSIT15.Models.UserRole.Admin)</div></div>
+                <i class="bi bi-shield-fill stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Finance Managers</div><div class="stat-value mt-1">@Model.Count(u => u.UserRole == ProVMSIT15.Models.UserRole.Finance)</div></div>
+                <i class="bi bi-cash-coin stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Procurement Officers</div><div class="stat-value mt-1">@Model.Count(u => u.UserRole == ProVMSIT15.Models.UserRole.Procurement)</div></div>
+                <i class="bi bi-briefcase stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-0">
+    <div class="card-section-header">
+        <i class="bi bi-table text-primary"></i>
+        <h6>Internal User Registry</h6>
+        <span class="badge ms-auto" style="background:#f1f5f9;color:#475569;font-size:.72rem">Vendors excluded — public portal only</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Department</th>
+                    <th>Provisioned</th>
+                    <th>Update Role</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                <tr><td colspan="7">
+                    <div class="provms-empty-state" style="padding:2.5rem">
+                        <i class="bi bi-people empty-icon"></i>
+                        <h5>No Users Provisioned</h5>
+                        <p>Use the button above to provision the first internal user account.</p>
+                    </div>
+                </td></tr>
+                }
+                @foreach (var u in Model)
+                {
+                var roleCls = u.UserRole switch {
+                    ProVMSIT15.Models.UserRole.Admin => "topbar-role-badge role-Admin",
+                    ProVMSIT15.Models.UserRole.Finance => "topbar-role-badge role-Finance",
+                    ProVMSIT15.Models.UserRole.Procurement => "topbar-role-badge role-Procurement",
+                    _ => "topbar-role-badge role-User"
+                };
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="provms-avatar-sm" style="width:30px;height:30px;font-size:.75rem">@u.FullName[0].ToString().ToUpper()</div>
+                            <span class="fw-semibold">@u.FullName</span>
+                        </div>
+                    </td>
+                    <td class="small">@u.Email</td>
+                    <td><span class="@roleCls">@u.UserRole</span></td>
+                    <td><span class="badge bg-light text-dark border">@(u.DepartmentCode ?? "—")</span></td>
+                    <td class="small">@u.CreatedAt.ToString("MMM dd, yyyy")</td>
+                    <td>
+                        <form asp-action="UpdateRole" method="post" class="d-flex gap-1">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@u.ID" />
+                            <select name="role" class="form-select form-select-sm" style="width:auto">
+                                @foreach (var r in new[] { ProVMSIT15.Models.UserRole.Admin, ProVMSIT15.Models.UserRole.Finance, ProVMSIT15.Models.UserRole.Procurement, ProVMSIT15.Models.UserRole.User })
+                                {
+                                    if (r == u.UserRole) { <option value="@r" selected>@r</option> }
+                                    else { <option value="@r">@r</option> }
+                                }
+                            </select>
+                            <button class="btn btn-sm btn-primary">Save</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form asp-action="Deactivate" method="post" onsubmit="return confirm('Remove @u.FullName from the system?')">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@u.ID" />
+                            <button class="btn-reject btn btn-sm"><i class="bi bi-person-x"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,100 @@
+@model IEnumerable<ProVMSIT15.Models.VendorItem>
+@{ ViewData["Title"] = "Marketplace"; Layout = "_Layout"; }
+
+<div class="provms-page-header">
+    <h4 class="fw-bold mb-1"><i class="bi bi-shop me-2"></i>Internal Marketplace</h4>
+    <p class="mb-0 opacity-75 small">Browse active supplier catalog items and place requisitions</p>
+</div>
+
+    <div class="provms-card p-3 mb-4">
+        <form method="get" asp-controller="Catalog" asp-action="Marketplace" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label small fw-semibold">Search Items</label>
+                <input type="text" name="search" value="@ViewBag.Search" class="form-control" placeholder="Item name or vendor..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold">Category</label>
+                <select name="category" class="form-select">
+                    <option value="">All Categories</option>
+                    <option value="IT_Hardware" selected="@(ViewBag.Category == "IT_Hardware")">IT Hardware</option>
+                    <option value="Office_Facilities" selected="@(ViewBag.Category == "Office_Facilities")">Office Facilities</option>
+                    <option value="Marketing_Collateral" selected="@(ViewBag.Category == "Marketing_Collateral")">Marketing Collateral</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn w-100" style="background:#1a2b4a;color:white">
+                    <i class="bi bi-search me-1"></i>Filter
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a asp-controller="Catalog" asp-action="Marketplace" class="btn btn-outline-secondary w-100">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="provms-card">
+            <div class="provms-empty-state">
+                <i class="bi bi-bag-x empty-icon"></i>
+                <h5>No Items Available</h5>
+                <p>No active vendor catalog items match your search criteria. Try adjusting the filters.</p>
+                <a asp-controller="Catalog" asp-action="Marketplace" class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-counterclockwise me-2"></i>Clear Filters</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="catalog-grid">
+            @foreach (var item in Model)
+            {
+                <div class="catalog-item-card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="fw-bold">@item.ItemName</span>
+                            <span class="badge bg-light text-dark small">@item.Category.ToString().Replace("_"," ")</span>
+                        </div>
+                        <div class="small opacity-75 mt-1"><i class="bi bi-building me-1"></i>@item.Vendor?.CompanyName</div>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="price-tag mb-3">&#8369;@item.UnitPrice.ToString("N2") <span class="small fw-normal text-muted">/ unit</span></div>
+                        <form asp-controller="Catalog" asp-action="PlaceRequisition" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="itemId" value="@item.ID" id="itemId" />
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Quantity</label>
+                                <input type="number" name="quantity" id="quantityInput" min="1" value="1"
+                                       class="form-control" onchange="updateSingleTotal(this, @item.UnitPrice)" />
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-2 rounded"
+                                 style="background:#f8fafc;border:1px solid #e2e8f0">
+                                <span class="small text-muted">Total:</span>
+                                <span class="fw-bold text-primary total-display">&#8369;@item.UnitPrice.ToString("N2")</span>
+                            </div>
+                            <button type="submit" class="btn w-100 btn-primary fw-semibold">
+                                <i class="bi bi-cart-plus me-2"></i>Place Requisition
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+function updateSingleTotal(input, unitPrice) {
+    const qty = parseInt(input.value) || 0;
+    const card = input.closest('.catalog-item-card');
+    const disp = card.querySelector('.total-display');
+    if (disp) disp.textContent = '\u20b1' + (unitPrice * qty).toFixed(2);
+}
+document.querySelectorAll('input[name="quantity"]').forEach(inp => {
+    inp.addEventListener('input', function() {
+        const price = parseFloat(this.closest('form').querySelector('input[name="itemId"]').dataset.price || 0);
+        updateSingleTotal(this, price);
+    });
+});
+</script>
+}

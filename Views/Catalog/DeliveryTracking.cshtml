@@ -1,0 +1,108 @@
+@model List<ProVMSIT15.Models.PurchaseRequisition>
+@{
+    ViewData["Title"] = "Delivery Tracking";
+    ViewData["BreadcrumbModule"] = "Purchase Requisition";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-geo-alt fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Delivery Tracking</h4>
+            <small class="opacity-75">Live status of in-transit &amp; issued purchase orders</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">PO Issued</div><div class="stat-value mt-1">@Model.Count(r => r.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.PO_Issued)</div></div>
+                <i class="bi bi-file-earmark-check stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">In Transit</div><div class="stat-value mt-1">@Model.Count(r => r.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.In_Transit)</div></div>
+                <i class="bi bi-truck stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card purple">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Value</div><div class="stat-value mt-1" style="font-size:1.2rem">₱@Model.Sum(r => r.TotalCalculatedAmount).ToString("N0")</div></div>
+                <i class="bi bi-currency-exchange stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="provms-stat-card teal">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Shipments</div><div class="stat-value mt-1">@Model.Count</div></div>
+                <i class="bi bi-box-seam stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-0">
+    <div class="px-4 py-3 border-bottom d-flex align-items-center gap-2">
+        <i class="bi bi-pin-map-fill text-primary"></i>
+        <h6 class="fw-bold mb-0">Active Shipments</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>PO Number</th>
+                    <th>Item</th>
+                    <th>Vendor</th>
+                    <th>Requester</th>
+                    <th>Qty</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    @if (User.IsInRole("Vendor"))
+                    {
+                    <th>Action</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                <tr><td colspan="9" class="text-center text-muted py-4"><i class="bi bi-inbox fs-4 d-block mb-2"></i>No active shipments.</td></tr>
+                }
+                @foreach (var r in Model)
+                {
+                var statusCls = r.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.In_Transit ? "badge-workflow" : "badge-pending";
+                <tr>
+                    <td><code class="small">PO-@r.ID.ToString("D5")</code></td>
+                    <td class="fw-semibold">@r.Item?.ItemName</td>
+                    <td class="small">@r.Item?.Vendor?.CompanyName</td>
+                    <td class="small">@r.Requester?.FullName</td>
+                    <td>@r.Quantity</td>
+                    <td class="fw-bold text-primary">₱@r.TotalCalculatedAmount.ToString("N2")</td>
+                    <td><span class="status-badge @statusCls">@r.WorkflowStatus.ToString().Replace("_", " ")</span></td>
+                    <td class="small">@r.CreatedAt.ToString("MMM dd, yyyy")</td>
+                    @if (User.IsInRole("Vendor") && r.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.PO_Issued)
+                    {
+                    <td>
+                        <form asp-controller="Catalog" asp-action="MarkInTransit" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@r.ID" />
+                            <button class="btn-approve btn btn-sm">
+                                <i class="bi bi-truck me-1"></i>Mark In Transit
+                            </button>
+                        </form>
+                    </td>
+                    }
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

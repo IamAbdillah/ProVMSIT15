@@ -1,0 +1,162 @@
+@{ ViewData["Title"] = "Command Center"; ViewData["BreadcrumbModule"] = "Dashboard"; Layout = "_Layout"; }
+
+<div class="provms-page-header">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2"></i>Command Center</h4>
+            <p class="mb-0 opacity-75 small">Live business intelligence &amp; system analytics</p>
+        </div>
+        <div class="text-end opacity-75 small">
+            <i class="bi bi-clock me-1"></i>@DateTime.Now.ToString("dddd, dd MMM yyyy HH:mm")
+        </div>
+    </div>
+</div>
+
+    @* KPI Stat Cards *@
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="provms-stat-card blue">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="stat-label">Active Vendors</div>
+                        <div class="stat-value mt-1">@ViewBag.ActiveVendors</div>
+                    </div>
+                    <i class="bi bi-building-check stat-icon"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="provms-stat-card amber">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="stat-label">Awaiting Review</div>
+                        <div class="stat-value mt-1">@ViewBag.PendingVendors</div>
+                    </div>
+                    <i class="bi bi-hourglass-split stat-icon"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="provms-stat-card purple">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="stat-label">Pending Approvals</div>
+                        <div class="stat-value mt-1">@ViewBag.PendingReqs</div>
+                    </div>
+                    <i class="bi bi-clipboard-check stat-icon"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="provms-stat-card green">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="stat-label">Total Requisitions</div>
+                        <div class="stat-value mt-1">@ViewBag.TotalReqs</div>
+                    </div>
+                    <i class="bi bi-receipt stat-icon"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Charts Row 1 *@
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="chart-card h-100">
+                <div class="chart-card-header">
+                    <i class="bi bi-pie-chart-fill text-primary"></i>
+                    <h6>Department Expenditure</h6>
+                </div>
+                <canvas id="expenseChart"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-card h-100">
+                <div class="chart-card-header">
+                    <i class="bi bi-bar-chart-fill text-success"></i>
+                    <h6>Budget Allocation vs Remaining</h6>
+                </div>
+                <canvas id="budgetChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    @* Chart Row 2 *@
+    <div class="row g-4 mb-4">
+        <div class="col-md-8">
+            <div class="chart-card h-100">
+                <div class="chart-card-header">
+                    <i class="bi bi-trophy-fill text-warning"></i>
+                    <h6>Vendor Performance Scores</h6>
+                </div>
+                <canvas id="vendorScoreChart"></canvas>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="chart-card h-100">
+                <div class="chart-card-header">
+                    <i class="bi bi-lightning-charge-fill text-primary"></i>
+                    <h6>Quick Actions</h6>
+                </div>
+                <div class="d-flex flex-column gap-2">
+                    @if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
+                    {
+                    <a asp-controller="Vendor" asp-action="AccreditationDesk" class="quick-action-btn">
+                        <i class="bi bi-clipboard2-check text-primary"></i>
+                        <span>Accreditation Desk</span>
+                        @if ((int)ViewBag.PendingVendors > 0)
+                        { <span class="badge bg-warning text-dark">@ViewBag.PendingVendors</span> }
+                    </a>
+                    }
+                    @if (User.IsInRole("Finance") || User.IsInRole("Admin"))
+                    {
+                    <a asp-controller="Catalog" asp-action="ApprovalWorkflow" class="quick-action-btn">
+                        <i class="bi bi-check2-circle text-warning"></i>
+                        <span>Approval Workflow</span>
+                        @if ((int)ViewBag.PendingReqs > 0)
+                        { <span class="badge bg-danger">@ViewBag.PendingReqs</span> }
+                    </a>
+                    }
+                    @if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
+                    {
+                    <a asp-controller="Catalog" asp-action="POVault" class="quick-action-btn">
+                        <i class="bi bi-file-earmark-ruled text-success"></i>
+                        <span>Purchase Order Vault</span>
+                    </a>
+                    }
+                    <a asp-controller="Evaluation" asp-action="Leaderboard" class="quick-action-btn">
+                        <i class="bi bi-trophy text-warning"></i>
+                        <span>Performance Leaderboard</span>
+                    </a>
+                    <a asp-controller="Dashboard" asp-action="Reports" class="quick-action-btn">
+                        <i class="bi bi-file-bar-graph text-info"></i>
+                        <span>Reports &amp; Insights</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+@section Scripts {
+@{
+    var expLabelJson = System.Text.Json.JsonSerializer.Serialize(((IEnumerable<string>)ViewBag.ExpenseLabels).ToArray());
+    var expValJson = System.Text.Json.JsonSerializer.Serialize(((IEnumerable<decimal>)ViewBag.ExpenseValues).ToArray());
+    var budLabelJson = System.Text.Json.JsonSerializer.Serialize(((IEnumerable<string>)ViewBag.BudgetLabels).ToArray());
+    var budAllocJson = System.Text.Json.JsonSerializer.Serialize(((IEnumerable<decimal>)ViewBag.BudgetAllocated).ToArray());
+    var budRemJson = System.Text.Json.JsonSerializer.Serialize(((IEnumerable<decimal>)ViewBag.BudgetRemaining).ToArray());
+    var vScoreLabelJson = System.Text.Json.JsonSerializer.Serialize(((IEnumerable<string>)ViewBag.VendorScoreLabels).ToArray());
+    var vScoreValJson = System.Text.Json.JsonSerializer.Serialize(((IEnumerable<double>)ViewBag.VendorScoreValues).ToArray());
+}
+<script>
+initDashboardCharts(
+    @Html.Raw(expLabelJson),
+    @Html.Raw(expValJson),
+    @Html.Raw(budLabelJson),
+    @Html.Raw(budAllocJson),
+    @Html.Raw(budRemJson),
+    @Html.Raw(vScoreLabelJson),
+    @Html.Raw(vScoreValJson)
+);
+</script>
+}

@@ -1,0 +1,20 @@
+@{ ViewData["Title"] = "Registration Restricted"; Layout = "_Layout"; }
+
+<div class="min-vh-100 d-flex align-items-center justify-content-center" style="background: linear-gradient(135deg, #0f1c33 0%, #1e3a5f 50%, #2563eb 100%);">
+    <div class="col-12 col-sm-8 col-md-5 col-lg-4 px-3">
+        <div class="card border-0 shadow-lg text-center p-5" style="border-radius:16px">
+            <i class="bi bi-shield-lock-fill text-danger mb-3" style="font-size:3.5rem"></i>
+            <h4 class="fw-bold text-danger mb-2">Access Restricted</h4>
+            <p class="text-muted mb-4">
+                This registration path has been decommissioned.<br>
+                Internal staff accounts are <strong>provisioned exclusively</strong> by the System Administrator via the secure User Management console.
+            </p>
+            <a asp-controller="Vendor" asp-action="Onboarding" class="btn btn-outline-warning mb-2 fw-semibold">
+                <i class="bi bi-building-add me-2"></i>Vendor Registration Wizard
+            </a>
+            <a asp-controller="Auth" asp-action="Login" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Return to Login
+            </a>
+        </div>
+    </div>
+</div>

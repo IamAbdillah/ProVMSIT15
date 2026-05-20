@@ -1,0 +1,96 @@
+@model ProVMSIT15.Models.ViewModels.EvaluationViewModel
+@{
+    ViewData["Title"] = "Mandatory Supplier Evaluation";
+    ViewData["BreadcrumbModule"] = "Supplier Evaluation";
+}
+<div class="provms-page-header" style="background:linear-gradient(135deg,#1a2b4a,#0f3460)">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-star-fill fs-3 text-warning"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Mandatory Intake Evaluation</h4>
+            <small class="opacity-75">Receipt confirmed &mdash; complete this evaluation to finalize the transaction</small>
+        </div>
+        <span class="badge bg-danger ms-3 px-3 py-2"><i class="bi bi-lock-fill me-1"></i>Required</span>
+    </div>
+</div>
+<div class="alert alert-warning mx-0 mb-0 rounded-0 border-0 border-bottom d-flex align-items-center gap-2" style="background:#fff3cd">
+    <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+    <span><strong>This evaluation is non-bypassable.</strong> The transaction will remain in a pending-review state until all star ratings are submitted. Your feedback directly updates the vendor leaderboard and procurement analytics.</span>
+</div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="provms-card p-4">
+                <div class="mb-4 p-3 rounded" style="background:#f8fafc;border:1px solid #e2e8f0">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="small text-muted">Item</div>
+                            <div class="fw-semibold">@Model.ItemName</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="small text-muted">Vendor</div>
+                            <div class="fw-semibold">@Model.VendorName</div>
+                        </div>
+                    </div>
+                </div>
+
+                <form asp-controller="Evaluation" asp-action="Submit" method="post">
+                    @Html.AntiForgeryToken()
+                    <input asp-for="RequisitionID" type="hidden" />
+                    <input asp-for="ItemName" type="hidden" />
+                    <input asp-for="VendorName" type="hidden" />
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold"><i class="bi bi-lightning-charge me-1 text-warning"></i>Delivery Speed</label>
+                        <div class="star-rating" id="deliveryRating">
+                            @for (int i = 5; i >= 1; i--)
+                            {
+                                <input type="radio" name="DeliverySpeedStars" id="ds@(i)" value="@i" required />
+                                <label for="ds@(i)" title="@i star@(i>1?"s":"")"><i class="bi bi-star-fill"></i></label>
+                            }
+                        </div>
+                        <span asp-validation-for="DeliverySpeedStars" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold"><i class="bi bi-box-seam me-1 text-primary"></i>Item Condition</label>
+                        <div class="star-rating" id="conditionRating">
+                            @for (int i = 5; i >= 1; i--)
+                            {
+                                <input type="radio" name="ItemConditionStars" id="ic@(i)" value="@i" required />
+                                <label for="ic@(i)" title="@i star@(i>1?"s":"")"><i class="bi bi-star-fill"></i></label>
+                            }
+                        </div>
+                        <span asp-validation-for="ItemConditionStars" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold"><i class="bi bi-chat-dots me-1 text-info"></i>Communication Accuracy</label>
+                        <div class="star-rating" id="commRating">
+                            @for (int i = 5; i >= 1; i--)
+                            {
+                                <input type="radio" name="CommunicationStars" id="cs@(i)" value="@i" required />
+                                <label for="cs@(i)" title="@i star@(i>1?"s":"")"><i class="bi bi-star-fill"></i></label>
+                            }
+                        </div>
+                        <span asp-validation-for="CommunicationStars" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="PerformanceComments" class="form-label fw-semibold">
+                            <i class="bi bi-pencil me-1"></i>Additional Feedback <span class="text-muted fw-normal">(optional)</span>
+                        </label>
+                        <textarea asp-for="PerformanceComments" class="form-control" rows="4"
+                                  placeholder="Share your experience with this vendor..."></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-warning fw-bold w-100 py-2">
+                            <i class="bi bi-send me-2"></i>Submit Evaluation &amp; Complete Transaction
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

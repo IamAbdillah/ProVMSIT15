@@ -1,0 +1,110 @@
+@model ProVMSIT15.Models.Vendor
+@{ ViewData["Title"] = "Vendor Profile"; Layout = "_Layout"; }
+
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-person-badge fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">@Model.CompanyName</h4>
+            <small class="opacity-75">Your vendor portal workspace</small>
+        </div>
+    </div>
+</div>
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="provms-card p-0">
+                <div class="card-section-header">
+                    <i class="bi bi-building text-primary"></i>
+                    <h6>Company Details</h6>
+                </div>
+                <div class="p-4">
+                <dl class="mb-0">
+                    <dt class="small text-muted">Tax ID</dt>
+                    <dd class="fw-semibold"><code>@Model.TaxID</code></dd>
+                    <dt class="small text-muted">Contact Email</dt>
+                    <dd class="fw-semibold">@Model.ContactEmail</dd>
+                    <dt class="small text-muted">Status</dt>
+                    <dd>
+                        @{
+                            var cls = Model.OperationalStatus switch
+                            {
+                                ProVMSIT15.Models.OperationalStatus.Active => "badge-active",
+                                ProVMSIT15.Models.OperationalStatus.PendingVerification => "badge-pending",
+                                ProVMSIT15.Models.OperationalStatus.Suspended => "badge-suspended",
+                                ProVMSIT15.Models.OperationalStatus.Blacklisted => "badge-blacklisted",
+                                _ => "bg-secondary"
+                            };
+                        }
+                        <span class="status-badge @cls">@Model.OperationalStatus.ToString().Replace("V"," V")</span>
+                    </dd>
+                    <dt class="small text-muted">Last Updated</dt>
+                    <dd class="small">@Model.UpdatedAt.ToString("dd MMM yyyy HH:mm")</dd>
+                </dl>
+                @if (!string.IsNullOrEmpty(Model.DocumentVaultURL))
+                {
+                    <a href="@Model.DocumentVaultURL" target="_blank" class="btn btn-outline-danger btn-sm w-100 mt-3">
+                        <i class="bi bi-file-earmark-pdf me-2"></i>View Submitted Document
+                    </a>
+                }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="provms-card p-0">
+                <div class="card-section-header">
+                    <i class="bi bi-grid text-primary"></i>
+                    <h6>My Product Catalog</h6>
+                    <span class="badge ms-auto" style="background:#dbeafe;color:#1e40af">@Model.Items.Count items</span>
+                </div>
+                <div class="p-3">
+                @if (!Model.Items.Any())
+                {
+                    <div class="provms-empty-state" style="padding:2rem">
+                        <i class="bi bi-inbox empty-icon"></i>
+                        <h5>No Catalog Items</h5>
+                        <p>Your product catalog is empty. Add items during onboarding or contact the administrator.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover provms-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Item Name</th>
+                                    <th>Category</th>
+                                    <th>Unit Price</th>
+                                    <th>Update Price</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.Items)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@item.ItemName</td>
+                                        <td><span class="badge bg-secondary small">@item.Category.ToString().Replace("_"," ")</span></td>
+                                        <td class="fw-bold text-primary">$@item.UnitPrice.ToString("N2")</td>
+                                        <td>
+                                            <form asp-controller="Vendor" asp-action="UpdateItemPrice" method="post" class="d-flex gap-1">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="itemId" value="@item.ID" />
+                                                <input type="text" inputmode="decimal" name="newPrice" value="@item.UnitPrice.ToString("F2")"
+                                                       class="form-control form-control-sm price-input" style="width:110px" />
+                                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,78 @@
+@model IEnumerable<ProVMSIT15.Models.PurchaseRequisition>
+@{ ViewData["Title"] = "My Orders"; Layout = "_Layout"; }
+
+<div class="provms-page-header">
+    <h4 class="fw-bold mb-1"><i class="bi bi-truck me-2"></i>My Assigned Orders</h4>
+    <p class="mb-0 opacity-75 small">View your purchase orders and update cargo status</p>
+</div>
+
+    @if (!Model.Any())
+    {
+        <div class="provms-card">
+            <div class="provms-empty-state">
+                <i class="bi bi-truck empty-icon"></i>
+                <h5>No Orders Assigned</h5>
+                <p>Purchase orders assigned to your company will appear here once POs are issued.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="provms-card p-0">
+            <div class="card-section-header">
+                <i class="bi bi-truck text-primary"></i>
+                <h6>Active Orders</h6>
+                <span class="badge ms-auto" style="background:#dbeafe;color:#1e40af">@Model.Count() orders</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover provms-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>PO Number</th>
+                            <th>Item</th>
+                            <th>Requester</th>
+                            <th>Qty</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var req in Model)
+                        {
+                            var cls = req.WorkflowStatus == WorkflowStatus.Delivered ? "badge-delivered" :
+                                      req.WorkflowStatus == WorkflowStatus.PO_Issued || req.WorkflowStatus == WorkflowStatus.In_Transit ? "badge-workflow" : "badge-archived";
+                            var lbl = req.WorkflowStatus == WorkflowStatus.PO_Issued ? "PO Issued" :
+                                      req.WorkflowStatus == WorkflowStatus.In_Transit ? "In Transit" :
+                                      req.WorkflowStatus == WorkflowStatus.Delivered ? "Delivered" : req.WorkflowStatus.ToString();
+                            <tr>
+                                <td><code class="fw-bold">PO-@req.ID.ToString("D6")</code></td>
+                                <td class="fw-semibold">@req.Item?.ItemName</td>
+                                <td class="small">@req.Requester?.FullName</td>
+                                <td>@req.Quantity</td>
+                                <td class="fw-bold text-primary">&#8369;@req.TotalCalculatedAmount.ToString("N2")</td>
+                                <td><span class="status-badge @cls">@lbl</span></td>
+                                <td>
+                                    @if (req.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.PO_Issued)
+                                    {
+                                        <form asp-controller="Catalog" asp-action="UpdateCargoStatus" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@req.ID" />
+                                            <button type="submit" class="btn btn-sm btn-warning fw-semibold">
+                                                <i class="bi bi-truck me-1"></i>Mark In Transit
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
