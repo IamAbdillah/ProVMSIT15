@@ -18,17 +18,25 @@
                 <form asp-controller="Dashboard" asp-action="AllocateBudget" method="post">
                     @Html.AntiForgeryToken()
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Department Code <span class="text-danger">*</span></label>
-                        <input type="text" name="departmentCode" class="form-control" placeholder="e.g. IT, HR, FIN" required maxlength="20" />
+                        <label class="form-label small fw-semibold">Department <span class="text-danger">*</span></label>
+                        <select name="departmentCode" id="deptCodeSelect" class="form-select" required onchange="fillDeptName(this.value)">
+                            <option value="" disabled selected>— Select Department —</option>
+                            <option value="IT">IT — Information Technology</option>
+                            <option value="HR">HR — Human Resources</option>
+                            <option value="FINANCE">FINANCE — Finance Department</option>
+                            <option value="OPS">OPS — Operations</option>
+                            <option value="PROCUREMENT">PROCUREMENT — Procurement Division</option>
+                            <option value="SYS">SYS — System Administration</option>
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Department Name <span class="text-danger">*</span></label>
-                        <input type="text" name="departmentName" class="form-control" placeholder="e.g. Information Technology" required maxlength="100" />
+                        <input type="text" name="departmentName" id="deptNameInput" class="form-control" placeholder="Auto-filled" required maxlength="100" readonly />
                     </div>
                     <div class="mb-4">
-                        <label class="form-label small fw-semibold">Allocated Budget (USD) <span class="text-danger">*</span></label>
+                        <label class="form-label small fw-semibold">Allocated Budget (PHP) <span class="text-danger">*</span></label>
                         <div class="input-group">
-                            <span class="input-group-text">$</span>
+                            <span class="input-group-text">₱</span>
                             <input type="number" name="allocated" class="form-control" placeholder="0.00" step="0.01" min="0" required />
                         </div>
                     </div>
@@ -73,10 +81,10 @@
                                     <tr>
                                         <td><span class="badge bg-primary">@b.DepartmentCode</span></td>
                                         <td class="fw-semibold small">@b.DepartmentName</td>
-                                        <td class="fw-bold">$@b.AllocatedBudget.ToString("N2")</td>
-                                        <td class="text-danger">$@b.SpentAmount.ToString("N2")</td>
+                                        <td class="fw-bold">₱@b.AllocatedBudget.ToString("N2")</td>
+                                        <td class="text-danger">₱@b.SpentAmount.ToString("N2")</td>
                                         <td class="fw-bold @(b.RemainingBudget < 0 ? "text-danger" : "text-success")">
-                                            $@b.RemainingBudget.ToString("N2")
+                                            ₱@b.RemainingBudget.ToString("N2")
                                         </td>
                                         <td style="min-width:120px">
                                             <div class="d-flex align-items-center gap-1">
@@ -96,3 +104,19 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+const deptNames = {
+    'IT': 'Information Technology',
+    'HR': 'Human Resources',
+    'FINANCE': 'Finance Department',
+    'OPS': 'Operations',
+    'PROCUREMENT': 'Procurement Division',
+    'SYS': 'System Administration'
+};
+function fillDeptName(code) {
+    document.getElementById('deptNameInput').value = deptNames[code] || '';
+}
+</script>
+}

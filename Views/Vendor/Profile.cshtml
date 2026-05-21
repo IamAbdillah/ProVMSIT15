@@ -85,7 +85,7 @@
                                     <tr>
                                         <td class="fw-semibold">@item.ItemName</td>
                                         <td><span class="badge bg-secondary small">@item.Category.ToString().Replace("_"," ")</span></td>
-                                        <td class="fw-bold text-primary">$@item.UnitPrice.ToString("N2")</td>
+                                        <td class="fw-bold text-primary">₱@item.UnitPrice.ToString("N2")</td>
                                         <td>
                                             <form asp-controller="Vendor" asp-action="UpdateItemPrice" method="post" class="d-flex gap-1">
                                                 @Html.AntiForgeryToken()
