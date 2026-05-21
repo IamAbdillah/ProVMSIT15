@@ -25,6 +25,7 @@ wwwroot/uploads/
 
 ## dotnet secrets / local settings
 appsettings.Development.json
+appsettings.Production.json
 secrets.json
 
 ## OS
