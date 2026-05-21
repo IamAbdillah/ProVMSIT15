@@ -83,6 +83,22 @@ public class AuthController : Controller
         user.LockoutEnd = null;
         await _db.SaveChangesAsync();
 
+        // Vendor accreditation gate — block login until approved
+        if (user.UserRole == UserRole.Vendor)
+        {
+            var vendor = await _db.Vendors.FirstOrDefaultAsync(v => v.LinkedUserID == user.ID);
+            if (vendor == null || vendor.OperationalStatus == OperationalStatus.PendingVerification)
+            {
+                ModelState.AddModelError("", "Your vendor application is still pending accreditation review. You will be notified once approved.");
+                return View(model);
+            }
+            if (vendor.OperationalStatus == OperationalStatus.Suspended || vendor.OperationalStatus == OperationalStatus.Blacklisted)
+            {
+                ModelState.AddModelError("", "Your vendor account has been suspended. Please contact procurement for assistance.");
+                return View(model);
+            }
+        }
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.ID.ToString()),
