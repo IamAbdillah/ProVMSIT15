@@ -120,8 +120,9 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Auth}/{action=Login}/{id?}");
 
-using (var scope = app.Services.CreateScope())
+try
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     db.Database.EnsureCreated();
 
@@ -178,6 +179,11 @@ using (var scope = app.Services.CreateScope())
         }
     }
     db.SaveChanges();
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[SEED WARNING] Could not connect to database: {ex.Message}");
+    Console.WriteLine("[SEED WARNING] MySQL may not be running. Start MySQL and restart the app.");
 }
 
 app.Run();
