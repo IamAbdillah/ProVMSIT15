@@ -15,6 +15,8 @@ public class RecaptchaService
 
     public async Task<bool> VerifyAsync(string token)
     {
+        // Skip if key is placeholder (not yet configured)
+        if (_secretKey == "YOUR_SECRET_KEY_HERE") return true;
         if (string.IsNullOrWhiteSpace(token)) return false;
 
         var client = _httpFactory.CreateClient();
