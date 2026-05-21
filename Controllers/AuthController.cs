@@ -36,11 +36,38 @@ public class AuthController : Controller
         if (!ModelState.IsValid) return View(model);
 
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
+
+        // Phase A: Pre-authentication lockout gate
+        if (user != null && user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
+        {
+            ModelState.AddModelError("", "This account has been temporarily locked due to multiple invalid login attempts. Please try again in 15 minutes.");
+            return View(model);
+        }
+
+        // Phase B: Failed credential check
         if (user == null || !BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
         {
+            if (user != null)
+            {
+                user.AccessFailedCount++;
+                if (user.AccessFailedCount >= 5)
+                {
+                    user.LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(15);
+                    user.AccessFailedCount = 0;
+                    await _db.SaveChangesAsync();
+                    ModelState.AddModelError("", "This account has been temporarily locked due to multiple invalid login attempts. Please try again in 15 minutes.");
+                    return View(model);
+                }
+                await _db.SaveChangesAsync();
+            }
             ModelState.AddModelError("", "Invalid email or password.");
             return View(model);
         }
+
+        // Phase C: Successful login — reset lockout state
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
+        await _db.SaveChangesAsync();
 
         var claims = new List<Claim>
         {

@@ -28,6 +28,10 @@ public class AppUser
 
     public bool IsArchived { get; set; } = false;
 
+    public int AccessFailedCount { get; set; } = 0;
+
+    public DateTimeOffset? LockoutEnd { get; set; }
+
     public ICollection<PurchaseRequisition> Requisitions { get; set; } = new List<PurchaseRequisition>();
     public ICollection<InAppNotification> Notifications { get; set; } = new List<InAppNotification>();
 }
