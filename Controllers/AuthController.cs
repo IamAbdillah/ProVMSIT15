@@ -14,11 +14,15 @@ public class AuthController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly JwtService _jwt;
+    private readonly RecaptchaService _recaptcha;
+    private readonly string _recaptchaSiteKey;
 
-    public AuthController(ApplicationDbContext db, JwtService jwt)
+    public AuthController(ApplicationDbContext db, JwtService jwt, RecaptchaService recaptcha, IConfiguration config)
     {
         _db = db;
         _jwt = jwt;
+        _recaptcha = recaptcha;
+        _recaptchaSiteKey = config["ReCaptcha:SiteKey"]!;
     }
 
     [HttpGet]
@@ -26,6 +30,7 @@ public class AuthController : Controller
     {
         if (User.Identity?.IsAuthenticated == true)
             return RedirectToAction("Index", "Dashboard");
+        ViewBag.RecaptchaSiteKey = _recaptchaSiteKey;
         return View();
     }
 
@@ -33,7 +38,16 @@ public class AuthController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel model)
     {
+        ViewBag.RecaptchaSiteKey = _recaptchaSiteKey;
         if (!ModelState.IsValid) return View(model);
+
+        // reCAPTCHA verification
+        var captchaToken = Request.Form["g-recaptcha-response"].ToString();
+        if (!await _recaptcha.VerifyAsync(captchaToken))
+        {
+            ModelState.AddModelError("", "Please complete the reCAPTCHA verification.");
+            return View(model);
+        }
 
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
 
