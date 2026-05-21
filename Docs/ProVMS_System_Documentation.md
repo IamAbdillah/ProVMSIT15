@@ -1,6 +1,6 @@
 # ProVMS — Procurement & Vendor Management System
 ## Complete System Documentation & Manual Testing Guide
-
+Login with admin@provms.com / Admin@ProVMS2026!.
 **Version:** 1.1 | **Stack:** ASP.NET Core 9.0 MVC + MySQL | **Environment:** `http://localhost:5239` (dev) / `http://erprovms.runasp.net` (production)
 
 ---
