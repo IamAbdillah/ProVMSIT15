@@ -1,0 +1,111 @@
+@model IEnumerable<ProVMSIT15.Models.FinancialAuditTrail>
+@{
+    ViewData["Title"] = "Financial Audit Trail";
+    ViewData["BreadcrumbModule"] = "Procurement Analytics";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-shield-lock-fill fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">Financial Audit Trail</h4>
+            <small class="opacity-75">Immutable log of all financial workflow state changes — timestamped and user-attributed</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Entries</div><div class="stat-value mt-1">@Model.Count()</div></div>
+                <i class="bi bi-journal-text stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Today</div><div class="stat-value mt-1">@Model.Count(a => a.SystemTimestamp.Date == DateTime.UtcNow.Date)</div></div>
+                <i class="bi bi-calendar-check stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Unique Actors</div><div class="stat-value mt-1">@Model.Select(a => a.UserID).Distinct().Count()</div></div>
+                <i class="bi bi-people stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-0">
+    <div class="card-section-header">
+        <i class="bi bi-shield-lock-fill text-primary"></i>
+        <h6>Audit Log (Latest 500)</h6>
+        <span class="badge ms-auto" style="background:#dbeafe;color:#1e40af">@Model.Count() entries</span>
+    </div>
+    @if (!Model.Any())
+    {
+    <div class="provms-empty-state p-4">
+        <i class="bi bi-journal-x empty-icon"></i>
+        <h5>No Audit Entries</h5>
+        <p>Financial transactions will be logged here once workflow activity begins.</p>
+    </div>
+    }
+    else
+    {
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Event Type</th>
+                    <th>Record ID</th>
+                    <th>Actor</th>
+                    <th>IP Address</th>
+                    <th>Timestamp (UTC)</th>
+                    <th>Before</th>
+                    <th>After</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model)
+                {
+                <tr>
+                    <td><code class="small">@a.AuditID</code></td>
+                    <td>
+                        <span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:.75rem">
+                            @a.TransactionType.Replace("_", " ")
+                        </span>
+                    </td>
+                    <td><code class="small">REF-@a.RecordID.ToString("D4")</code></td>
+                    <td class="small">@(a.Actor?.FullName ?? $"UID:{a.UserID}")</td>
+                    <td><code class="small text-muted">@a.MachineIPAddress</code></td>
+                    <td class="small text-muted">@a.SystemTimestamp.ToString("dd MMM yyyy HH:mm:ss")</td>
+                    <td>
+                        @if (a.PayloadBefore != null)
+                        {
+                        <span class="text-muted small" title="@a.PayloadBefore">
+                            <i class="bi bi-eye me-1"></i><code class="small">@(a.PayloadBefore.Length > 40 ? a.PayloadBefore[..40] + "…" : a.PayloadBefore)</code>
+                        </span>
+                        }
+                        else { <span class="text-muted small">—</span> }
+                    </td>
+                    <td>
+                        @if (a.PayloadAfter != null)
+                        {
+                        <span class="text-muted small" title="@a.PayloadAfter">
+                            <i class="bi bi-eye me-1"></i><code class="small">@(a.PayloadAfter.Length > 40 ? a.PayloadAfter[..40] + "…" : a.PayloadAfter)</code>
+                        </span>
+                        }
+                        else { <span class="text-muted small">—</span> }
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+</div>

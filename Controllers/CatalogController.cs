@@ -15,14 +15,16 @@ public class CatalogController : Controller
     private readonly NotificationService _notif;
     private readonly BudgetGuardService _budget;
     private readonly PdfService _pdf;
+    private readonly AuditService _audit;
 
     public CatalogController(ApplicationDbContext db, NotificationService notif,
-        BudgetGuardService budget, PdfService pdf)
+        BudgetGuardService budget, PdfService pdf, AuditService audit)
     {
         _db = db;
         _notif = notif;
         _budget = budget;
         _pdf = pdf;
+        _audit = audit;
     }
 
     private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -74,6 +76,7 @@ public class CatalogController : Controller
         {
             TempData["Error"] = msg;
             await _notif.SendAsync(CurrentUserId, $"Requisition for '{item.ItemName}' blocked: {msg}");
+            Response.StatusCode = 400;
             return RedirectToAction("Marketplace");
         }
 
@@ -92,6 +95,13 @@ public class CatalogController : Controller
         _db.PurchaseRequisitions.Add(req);
         await _db.SaveChangesAsync();
 
+        // AUDIT: PR_Created
+        await _audit.LogTransactionAsync("PR_Created", req.ID,
+            payloadAfter: new { req.ID, req.RequesterID, req.ItemID, req.Quantity, req.TotalCalculatedAmount, Status = "Pending_Finance" });
+
+        // SLA: FinancialCleardown timer starts now
+        await _audit.OpenSLAAsync(SLAWorkflowType.FinancialCleardown, req.ID);
+
         await _notif.SendAsync(CurrentUserId, $"Requisition submitted for '{item.ItemName}' x{quantity}. ₱{total:N2} pre-encumbered. Awaiting Finance approval.");
         await _notif.SendToRoleAsync(UserRole.Finance, $"🔔 PR #{req.ID} — '{item.ItemName}' requires immediate budget clearance review.");
 
@@ -101,24 +111,22 @@ public class CatalogController : Controller
     }
 
     [HttpGet]
+    [Authorize(Policy = "RequesterOnly")]
     public async Task<IActionResult> MyRequests()
     {
         var userId = CurrentUserId;
-        var isInternal = User.IsInRole("Admin") || User.IsInRole("Procurement") || User.IsInRole("Finance") || User.IsInRole("User");
-
-        IQueryable<PurchaseRequisition> query = _db.PurchaseRequisitions
+        var reqs = await _db.PurchaseRequisitions
             .Include(r => r.Item).ThenInclude(i => i.Vendor)
             .Include(r => r.Requester)
-            .Include(r => r.Evaluation);
-
-        if (!isInternal || User.IsInRole("User"))
-            query = query.Where(r => r.RequesterID == userId);
-
-        return View(await query.OrderByDescending(r => r.CreatedAt).ToListAsync());
+            .Include(r => r.Evaluation)
+            .Where(r => r.RequesterID == userId)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+        return View(reqs);
     }
 
     [HttpGet]
-    [Authorize(Policy = "FinanceOrAdmin")]
+    [Authorize(Policy = "FinanceOnly")]
     public async Task<IActionResult> ApprovalWorkflow()
     {
         var reqs = await _db.PurchaseRequisitions
@@ -142,9 +150,18 @@ public class CatalogController : Controller
 
         if (req == null) return NotFound();
 
+        var beforeApprove = new { req.ID, PreviousStatus = req.WorkflowStatus.ToString() };
         req.WorkflowStatus = WorkflowStatus.Approved_Budget;
         req.ApprovedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+
+        // AUDIT: PR_Approved
+        await _audit.LogTransactionAsync("PR_Approved", req.ID,
+            payloadBefore: beforeApprove,
+            payloadAfter: new { req.ID, Status = "Approved_Budget", ApprovedAt = req.ApprovedAt });
+
+        // SLA: FinancialCleardown closes (24h limit)
+        await _audit.CloseSLAAsync(SLAWorkflowType.FinancialCleardown, req.ID, 24m);
 
         await _notif.SendAsync(req.RequesterID, $"✅ Budget approved for PR #{req.ID}. Procurement will issue the PO shortly.");
         await _notif.SendToRoleAsync(UserRole.Procurement, $"🔔 PR #{req.ID} approved by Finance. Issue Purchase Order now.");
@@ -166,9 +183,18 @@ public class CatalogController : Controller
         if (req.IsEncumbered)
             await _budget.RestoreBudgetAsync(dept, req.TotalCalculatedAmount);
 
+        var beforeReject = new { req.ID, PreviousStatus = req.WorkflowStatus.ToString() };
         req.WorkflowStatus = WorkflowStatus.Archived;
         req.IsEncumbered = false;
         await _db.SaveChangesAsync();
+
+        // AUDIT: PR_Rejected
+        await _audit.LogTransactionAsync("PR_Rejected", req.ID,
+            payloadBefore: beforeReject,
+            payloadAfter: new { req.ID, Status = "Archived", Reason = "Finance rejection", BudgetReleased = req.TotalCalculatedAmount });
+
+        // SLA: FinancialCleardown closes (24h limit)
+        await _audit.CloseSLAAsync(SLAWorkflowType.FinancialCleardown, req.ID, 24m);
 
         await _notif.SendAsync(req.RequesterID, $"❌ PR #{req.ID} rejected by Finance. ₱{req.TotalCalculatedAmount:N2} released back to department budget.");
 
@@ -201,7 +227,7 @@ public class CatalogController : Controller
     }
 
     [HttpPost]
-    [Authorize(Policy = "ProcurementOrAdmin")]
+    [Authorize(Policy = "ProcurementOnly")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> IssuePO(int id)
     {
@@ -212,9 +238,18 @@ public class CatalogController : Controller
 
         if (req == null) return NotFound();
 
+        var beforePO = new { req.ID, PreviousStatus = req.WorkflowStatus.ToString() };
         req.WorkflowStatus = WorkflowStatus.PO_Issued;
         req.POIssuedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+
+        // AUDIT: PO_Issued
+        await _audit.LogTransactionAsync("PO_Issued", req.ID,
+            payloadBefore: beforePO,
+            payloadAfter: new { req.ID, Status = "PO_Issued", POIssuedAt = req.POIssuedAt });
+
+        // SLA: VendorFulfillment timer starts now (72h)
+        await _audit.OpenSLAAsync(SLAWorkflowType.VendorFulfillment, req.ID);
 
         if (req.Item?.Vendor?.LinkedUserID.HasValue == true)
             await _notif.SendAsync(req.Item.Vendor.LinkedUserID!.Value, $"Purchase Order PO-{req.ID:D6} has been issued to you. Please fulfill.");
@@ -226,7 +261,7 @@ public class CatalogController : Controller
     }
 
     [HttpGet]
-    [Authorize(Policy = "ProcurementOrAdmin")]
+    [Authorize(Policy = "POVaultViewers")]
     public async Task<IActionResult> DownloadPO(int id)
     {
         var req = await _db.PurchaseRequisitions
@@ -261,8 +296,15 @@ public class CatalogController : Controller
             return RedirectToAction("VendorOrders");
         }
 
+        var beforeTransit = new { req.ID, PreviousStatus = req.WorkflowStatus.ToString() };
         req.WorkflowStatus = WorkflowStatus.In_Transit;
         await _db.SaveChangesAsync();
+
+        // AUDIT: In_Transit + SLA: VendorFulfillment closes (72h limit)
+        await _audit.LogTransactionAsync("Cargo_Dispatched", req.ID,
+            payloadBefore: beforeTransit,
+            payloadAfter: new { req.ID, Status = "In_Transit", DispatchedAt = DateTime.UtcNow });
+        await _audit.CloseSLAAsync(SLAWorkflowType.VendorFulfillment, req.ID, 72m);
 
         await _notif.SendAsync(req.RequesterID, $"Your order #{req.ID} is now In Transit!");
 
@@ -289,15 +331,21 @@ public class CatalogController : Controller
     }
 
     [HttpPost]
-    [Authorize(Policy = "ProcurementOrAdmin")]
+    [Authorize(Policy = "ProcurementOnly")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> MarkDelivered(int id)
     {
         var req = await _db.PurchaseRequisitions.FindAsync(id);
         if (req == null) return NotFound();
 
+        var beforeDelivered = new { req.ID, PreviousStatus = req.WorkflowStatus.ToString() };
         req.WorkflowStatus = WorkflowStatus.Delivered;
         await _db.SaveChangesAsync();
+
+        // AUDIT: Fulfillment_Settled
+        await _audit.LogTransactionAsync("Fulfillment_Settled", req.ID,
+            payloadBefore: beforeDelivered,
+            payloadAfter: new { req.ID, Status = "Delivered", ConfirmedAt = DateTime.UtcNow });
 
         await _notif.SendAsync(req.RequesterID, $"✅ Order #{req.ID} confirmed received. Please complete your mandatory supplier evaluation.");
 
@@ -305,7 +353,29 @@ public class CatalogController : Controller
         return RedirectToAction("Submit", "Evaluation", new { requisitionId = req.ID });
     }
 
+    // Receipt Confirmation: User C,R — user confirms their own order received
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = "RequesterOnly")]
+    public async Task<IActionResult> ConfirmReceipt(int id)
+    {
+        var req = await _db.PurchaseRequisitions.FindAsync(id);
+        if (req == null) return NotFound();
+        if (req.RequesterID != CurrentUserId) return Forbid();
+        if (req.WorkflowStatus != WorkflowStatus.In_Transit)
+        {
+            TempData["Error"] = "Order must be In Transit to confirm receipt.";
+            return RedirectToAction("MyRequests");
+        }
+        req.WorkflowStatus = WorkflowStatus.Delivered;
+        await _db.SaveChangesAsync();
+        await _audit.LogTransactionAsync("Receipt_Confirmed", req.ID,
+            payloadAfter: new { req.ID, Status = "Delivered", ConfirmedBy = CurrentUserId, ConfirmedAt = DateTime.UtcNow });
+        await _notif.SendAsync(req.RequesterID, $"✅ You confirmed receipt of Order #{req.ID}. Please submit your evaluation.");
+        TempData["Success"] = $"Receipt confirmed. Please evaluate the vendor.";  
+        return RedirectToAction("Submit", "Evaluation", new { requisitionId = req.ID });
+    }
+
     [HttpGet]
+    [Authorize(Policy = "DeliveryViewers")]
     public async Task<IActionResult> DeliveryTracking()
     {
         ViewData["Title"] = "Delivery Tracking";
@@ -327,21 +397,27 @@ public class CatalogController : Controller
         return View(await query.OrderByDescending(r => r.CreatedAt).ToListAsync());
     }
 
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Roles = "Vendor")]
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = "VendorOnly")]
     public async Task<IActionResult> MarkInTransit(int id)
     {
         var req = await _db.PurchaseRequisitions.Include(r => r.Item).ThenInclude(i => i!.Vendor).FirstOrDefaultAsync(r => r.ID == id);
         if (req == null) return NotFound();
         var email = User.Identity!.Name;
         if (req.Item?.Vendor?.ContactEmail != email) return Forbid();
+        var beforeTransit2 = new { req.ID, PreviousStatus = req.WorkflowStatus.ToString() };
         req.WorkflowStatus = WorkflowStatus.In_Transit;
         await _db.SaveChangesAsync();
+        await _audit.LogTransactionAsync("Cargo_Dispatched", req.ID,
+            payloadBefore: beforeTransit2,
+            payloadAfter: new { req.ID, Status = "In_Transit", DispatchedAt = DateTime.UtcNow });
+        await _audit.CloseSLAAsync(SLAWorkflowType.VendorFulfillment, req.ID, 72m);
         await _notif.SendAsync(req.RequesterID, $"Order #{req.ID} is now In Transit!");
         TempData["Success"] = "Order marked as In Transit.";
         return RedirectToAction("DeliveryTracking");
     }
 
     [HttpGet]
+    [Authorize(Policy = "RequesterOnly")]
     public async Task<IActionResult> GetItemPrice(int itemId)
     {
         var item = await _db.VendorItems.FindAsync(itemId);

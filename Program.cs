@@ -12,7 +12,7 @@ builder.Services.AddControllersWithViews();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseMySql(connectionString, new MariaDbServerVersion(new Version(10, 4, 32))));
 
 var jwtKey = builder.Configuration["Jwt:Key"]!;
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]!;
@@ -60,28 +60,41 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("AdminOnly",         p => p.RequireRole("Admin"));
-    options.AddPolicy("ProcurementOrAdmin",p => p.RequireRole("Admin", "Procurement"));
-    options.AddPolicy("FinanceOnly",       p => p.RequireRole("Finance"));
-    options.AddPolicy("InternalUsers",     p => p.RequireRole("Admin", "Procurement", "Finance", "User"));
-    options.AddPolicy("VendorOnly",        p => p.RequireRole("Vendor"));
-    options.AddPolicy("AllAuthenticated",  p => p.RequireAuthenticatedUser());
-    // RBAC spec: Marketplace & order placement = User role only
-    options.AddPolicy("RequesterOnly",     p => p.RequireRole("User"));
-    // RBAC spec: Analytics = Admin, Finance, Procurement (not User, not Vendor)
-    options.AddPolicy("AnalyticsViewers",  p => p.RequireRole("Admin", "Finance", "Procurement"));
-    // RBAC spec: PO Vault read = Admin, Finance, Procurement, User, Vendor(own)
-    options.AddPolicy("POVaultViewers",    p => p.RequireRole("Admin", "Finance", "Procurement", "User", "Vendor"));
-    // RBAC spec: Vendor Directory = Admin, Finance, Procurement (not plain User)
-    options.AddPolicy("DirectoryViewers",  p => p.RequireRole("Admin", "Finance", "Procurement"));
-    // RBAC spec: Finance approval read also available to Procurement
-    options.AddPolicy("FinanceOrAdmin",    p => p.RequireRole("Finance", "Admin"));
+    // ── Core role policies ────────────────────────────────────────────────
+    options.AddPolicy("AdminOnly",          p => p.RequireRole("Admin"));
+    options.AddPolicy("FinanceOnly",        p => p.RequireRole("Finance"));
+    options.AddPolicy("VendorOnly",         p => p.RequireRole("Vendor"));
+    options.AddPolicy("RequesterOnly",      p => p.RequireRole("User"));
+    options.AddPolicy("AllAuthenticated",   p => p.RequireAuthenticatedUser());
+
+    // ── Composite policies ────────────────────────────────────────────────
+    // Accreditation Desk write: Admin C,R,U,D | Procurement R,U
+    options.AddPolicy("ProcurementOrAdmin", p => p.RequireRole("Admin", "Procurement"));
+    // Procurement-only actions (matrix Admin=X): IssuePO, Requisition Allocation
+    options.AddPolicy("ProcurementOnly",    p => p.RequireRole("Procurement"));
+    // Finance approval + Admin read
+    options.AddPolicy("FinanceOrAdmin",     p => p.RequireRole("Finance", "Admin"));
+    // All internal staff (no Vendor)
+    options.AddPolicy("InternalUsers",      p => p.RequireRole("Admin", "Procurement", "Finance", "User"));
+
+    // ── RBAC Matrix policies ─────────────────────────────────────────────
+    // Analytics / Dashboard / Evaluation views / Contract read:
+    //   Admin R | Finance R | Procurement R  (User=X, Vendor=X)
+    options.AddPolicy("AnalyticsViewers",   p => p.RequireRole("Admin", "Finance", "Procurement"));
+    // Vendor Directory: Admin C,R,U | Procurement C,R,U | Finance R | User R  (Vendor=X)
+    options.AddPolicy("DirectoryViewers",   p => p.RequireRole("Admin", "Finance", "Procurement", "User"));
+    // PO Vault: Admin R | Procurement R,U | Finance R | User R(own) | Vendor R,U(own)
+    options.AddPolicy("POVaultViewers",     p => p.RequireRole("Admin", "Finance", "Procurement", "User", "Vendor"));
+    // Delivery Tracking: Admin R | Procurement R,U | User R(own) | Vendor R,U(dispatch)  (Finance=X)
+    options.AddPolicy("DeliveryViewers",    p => p.RequireRole("Admin", "Procurement", "User", "Vendor"));
 });
 
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<BudgetGuardService>();
 builder.Services.AddScoped<PdfService>();
+builder.Services.AddScoped<AuditService>();
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
@@ -132,6 +145,35 @@ using (var scope = app.Services.CreateScope())
         db.SaveChanges();
         Console.WriteLine($"[SEED] SysAdmin password reset → {adminEmail}");
     }
+
+    // ── SEED: Default Department Budgets for current fiscal year ──────────
+    int fy = DateTime.UtcNow.Year;
+    var defaultBudgets = new[]
+    {
+        ("IT",          "Information Technology",  5_000_000m),
+        ("HR",          "Human Resources",         2_000_000m),
+        ("FINANCE",     "Finance Department",      3_000_000m),
+        ("OPS",         "Operations",              4_000_000m),
+        ("PROCUREMENT", "Procurement Division",    6_000_000m),
+        ("SYS",         "System Administration",   1_000_000m),
+    };
+    foreach (var (code, name, alloc) in defaultBudgets)
+    {
+        if (!db.DepartmentBudgets.Any(b => b.DepartmentCode == code && b.FiscalYear == fy))
+        {
+            db.DepartmentBudgets.Add(new ProVMSIT15.Models.DepartmentBudget
+            {
+                DepartmentCode = code,
+                DepartmentName = name,
+                FiscalYear     = fy,
+                AllocatedBudget = alloc,
+                SpentAmount    = 0,
+                UpdatedAt      = DateTime.UtcNow
+            });
+            Console.WriteLine($"[SEED] Budget seeded → {code} FY{fy} ₱{alloc:N0}");
+        }
+    }
+    db.SaveChanges();
 }
 
 app.Run();

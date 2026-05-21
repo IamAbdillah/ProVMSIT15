@@ -82,7 +82,7 @@ public class UserManagementController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateRole(int id, UserRole role)
+    public async Task<IActionResult> UpdateRole(int id, UserRole role, string? departmentCode)
     {
         var user = await _db.Users.FindAsync(id);
         if (user == null) return NotFound();
@@ -101,6 +101,7 @@ public class UserManagementController : Controller
         }
 
         user.UserRole = role;
+        user.DepartmentCode = string.IsNullOrWhiteSpace(departmentCode) ? user.DepartmentCode : departmentCode.Trim().ToUpper();
         await _db.SaveChangesAsync();
         await _notif.SendAsync(user.ID, $"Your system role has been updated to {role} by an Administrator.");
 
@@ -121,10 +122,10 @@ public class UserManagementController : Controller
         var user = await _db.Users.FindAsync(id);
         if (user == null) return NotFound();
 
-        _db.Users.Remove(user);
+        user.IsArchived = true;
         await _db.SaveChangesAsync();
 
-        TempData["Success"] = $"User '{user.FullName}' removed from the system.";
+        TempData["Success"] = $"User '{user.FullName}' has been archived. Their record is retained for audit purposes.";
         return RedirectToAction("Index");
     }
 }

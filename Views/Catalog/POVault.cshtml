@@ -88,7 +88,7 @@
                                            class="btn btn-sm btn-outline-danger" title="Download PDF">
                                             <i class="bi bi-file-earmark-pdf"></i>
                                         </a>
-                                        @if (req.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.Approved_Budget)
+                                        @if (req.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.Approved_Budget && User.IsInRole("Procurement"))
                                         {
                                             <form asp-controller="Catalog" asp-action="IssuePO" method="post">
                                                 @Html.AntiForgeryToken()
@@ -98,7 +98,7 @@
                                                 </button>
                                             </form>
                                         }
-                                        @if (req.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.In_Transit)
+                                        @if (req.WorkflowStatus == ProVMSIT15.Models.WorkflowStatus.In_Transit && User.IsInRole("Procurement"))
                                         {
                                             <form asp-controller="Catalog" asp-action="MarkDelivered" method="post">
                                                 @Html.AntiForgeryToken()

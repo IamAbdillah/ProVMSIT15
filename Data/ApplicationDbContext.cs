@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using ProVMSIT15.Models;
 
 namespace ProVMSIT15.Data;
@@ -16,6 +17,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<DepartmentBudget> DepartmentBudgets { get; set; }
     public DbSet<Contract> Contracts { get; set; }
     public DbSet<ContractItem> ContractItems { get; set; }
+    public DbSet<FinancialAuditTrail> FinancialAuditTrails { get; set; }
+    public DbSet<SLAMilestoneLog> SLAMilestoneLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +28,7 @@ public class ApplicationDbContext : DbContext
         {
             e.HasIndex(u => u.Email).IsUnique();
             e.Property(u => u.UserRole).HasConversion<string>();
+            e.HasQueryFilter(u => !u.IsArchived);
         });
 
         modelBuilder.Entity<Vendor>(e =>
@@ -101,6 +105,29 @@ public class ApplicationDbContext : DbContext
              .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<FinancialAuditTrail>(e =>
+        {
+            e.HasKey(a => a.AuditID);
+            e.Property(a => a.TransactionType).HasMaxLength(50);
+            e.Property(a => a.MachineIPAddress).HasMaxLength(45);
+            e.Property(a => a.JWTSignatureHash).HasMaxLength(255);
+            e.Property(a => a.SystemTimestamp).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            e.HasOne(a => a.Actor)
+             .WithMany()
+             .HasForeignKey(a => a.UserID)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SLAMilestoneLog>(e =>
+        {
+            e.HasKey(s => s.LogID);
+            e.Property(s => s.WorkflowType).HasConversion<string>();
+            e.Property(s => s.SLABreachStatus).HasConversion<string>();
+            e.Property(s => s.DurationHours).HasColumnType("decimal(6,2)");
+            e.Property(s => s.StartTimestamp).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            e.Property(s => s.UpdatedDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
         modelBuilder.Entity<ContractItem>(e =>
         {
             e.Property(ci => ci.NegotiatedUnitPrice).HasColumnType("decimal(12,2)");
@@ -113,5 +140,38 @@ public class ApplicationDbContext : DbContext
              .HasForeignKey(ci => ci.VendorItemID)
              .OnDelete(DeleteBehavior.Restrict);
         });
+    }
+
+    // ── CFO IMMUTABILITY GUARD ──────────────────────────────────────────
+    // Blocks all Delete operations on immutable financial ledger tables.
+    public override int SaveChanges()
+    {
+        EnforceImmutability();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        EnforceImmutability();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void EnforceImmutability()
+    {
+        var forbidden = ChangeTracker.Entries()
+            .Where(e => e.State == EntityState.Deleted &&
+                        (e.Entity is FinancialAuditTrail ||
+                         e.Entity is PurchaseRequisition ||
+                         e.Entity is Contract ||
+                         e.Entity is ContractItem))
+            .ToList();
+
+        if (forbidden.Count > 0)
+        {
+            var typeName = forbidden.First().Entity.GetType().Name;
+            throw new InvalidOperationException(
+                $"CFO IMMUTABILITY VIOLATION: Deletion of '{typeName}' records is permanently prohibited. " +
+                "Financial ledger entries are append-only.");
+        }
     }
 }

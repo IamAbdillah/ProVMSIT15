@@ -1,0 +1,123 @@
+@model IEnumerable<ProVMSIT15.Models.SLAMilestoneLog>
+@{
+    ViewData["Title"] = "SLA Milestone Logs";
+    ViewData["BreadcrumbModule"] = "Procurement Analytics";
+}
+<div class="provms-page-header">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-alarm fs-3"></i>
+        <div>
+            <h4 class="mb-0 fw-bold">SLA Milestone Logs</h4>
+            <small class="opacity-75">Operational SLA tracking — Accreditation (48h), Finance Approval (24h), Vendor Fulfillment (72h)</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-3">
+        <div class="provms-stat-card green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Compliant</div><div class="stat-value mt-1">@Model.Count(s => s.SLABreachStatus == ProVMSIT15.Models.SLABreachStatus.Compliant && s.EndTimestamp != null)</div></div>
+                <i class="bi bi-check-circle stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="provms-stat-card red">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Breached</div><div class="stat-value mt-1">@Model.Count(s => s.SLABreachStatus == ProVMSIT15.Models.SLABreachStatus.Breached)</div></div>
+                <i class="bi bi-exclamation-triangle stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="provms-stat-card amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Open / In Progress</div><div class="stat-value mt-1">@Model.Count(s => s.EndTimestamp == null)</div></div>
+                <i class="bi bi-hourglass-split stat-icon"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="provms-stat-card blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div><div class="stat-label">Total Logged</div><div class="stat-value mt-1">@Model.Count()</div></div>
+                <i class="bi bi-journal-check stat-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="provms-card p-0">
+    <div class="card-section-header">
+        <i class="bi bi-alarm text-warning"></i>
+        <h6>SLA Records</h6>
+        <span class="badge ms-auto" style="background:#fef3c7;color:#92400e">@Model.Count() entries</span>
+    </div>
+    @if (!Model.Any())
+    {
+    <div class="provms-empty-state p-4">
+        <i class="bi bi-alarm empty-icon"></i>
+        <h5>No SLA Records</h5>
+        <p>SLA milestones will appear here once workflow activity begins.</p>
+    </div>
+    }
+    else
+    {
+    <div class="table-responsive">
+        <table class="table provms-table mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Workflow Type</th>
+                    <th>Reference ID</th>
+                    <th>Started</th>
+                    <th>Closed</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model)
+                {
+                var isBreach = s.SLABreachStatus == ProVMSIT15.Models.SLABreachStatus.Breached;
+                var isOpen   = s.EndTimestamp == null;
+                <tr class="@(isBreach ? "table-danger" : "")">
+                    <td><code class="small">@s.LogID</code></td>
+                    <td>
+                        <span class="badge" style="background:#dbeafe;color:#1e40af">
+                            @s.WorkflowType.ToString().Replace("Vendor", "Vendor ").Replace("Financial", "Financial ")
+                        </span>
+                    </td>
+                    <td><code class="small">REF-@s.ReferenceID.ToString("D4")</code></td>
+                    <td class="small text-muted">@s.StartTimestamp.ToString("dd MMM yyyy HH:mm")</td>
+                    <td class="small text-muted">
+                        @if (s.EndTimestamp.HasValue)
+                        { @s.EndTimestamp.Value.ToString("dd MMM yyyy HH:mm") }
+                        else
+                        { <span class="badge bg-warning text-dark">In Progress</span> }
+                    </td>
+                    <td class="small">
+                        @if (s.DurationHours.HasValue)
+                        { <span>@s.DurationHours.Value.ToString("F1")h</span> }
+                        else if (isOpen)
+                        {
+                            var elapsed = (decimal)(DateTime.UtcNow - s.StartTimestamp).TotalHours;
+                            <span class="text-warning">@elapsed.ToString("F1")h (running)</span>
+                        }
+                    </td>
+                    <td>
+                        @if (isOpen)
+                        { <span class="sla-warn"><i class="bi bi-hourglass-split"></i> Open</span> }
+                        else if (isBreach)
+                        { <span class="sla-breach"><i class="bi bi-alarm"></i> BREACHED</span> }
+                        else
+                        { <span class="sla-ok"><i class="bi bi-check-circle"></i> Compliant</span> }
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+</div>

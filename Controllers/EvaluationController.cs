@@ -9,7 +9,7 @@ using ProVMSIT15.Services;
 
 namespace ProVMSIT15.Controllers;
 
-[Authorize]
+[Authorize(Policy = "InternalUsers")]
 public class EvaluationController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -24,6 +24,7 @@ public class EvaluationController : Controller
     private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet]
+    [Authorize(Policy = "RequesterOnly")]
     public async Task<IActionResult> Submit(int requisitionId)
     {
         var req = await _db.PurchaseRequisitions
@@ -55,6 +56,7 @@ public class EvaluationController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "RequesterOnly")]
     public async Task<IActionResult> Submit(EvaluationViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
@@ -99,7 +101,7 @@ public class EvaluationController : Controller
     }
 
     [HttpGet]
-    [Authorize(Policy = "ProcurementOrAdmin")]
+    [Authorize(Policy = "AnalyticsViewers")]
     public async Task<IActionResult> Leaderboard()
     {
         var vendorScores = await _db.SupplierEvaluations
@@ -133,7 +135,7 @@ public class EvaluationController : Controller
         return View(vendorScores);
     }
 
-    [HttpGet, Authorize(Policy = "ProcurementOrAdmin")]
+    [HttpGet, Authorize(Policy = "AnalyticsViewers")]
     public async Task<IActionResult> Performance()
     {
         ViewData["Title"] = "Performance Evaluation";
@@ -157,7 +159,7 @@ public class EvaluationController : Controller
         return View(vendorScores);
     }
 
-    [HttpGet, Authorize(Policy = "ProcurementOrAdmin")]
+    [HttpGet, Authorize(Policy = "AnalyticsViewers")]
     public async Task<IActionResult> Benchmarking()
     {
         ViewData["Title"] = "Benchmarking";

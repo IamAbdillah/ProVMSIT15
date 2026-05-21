@@ -40,26 +40,36 @@
       <div class="sidebar-section-label px-3 pt-3 pb-1">VENDOR PORTAL</div>
       <a class="sidebar-link @(act == "Profile" ? "active" : "")"
          asp-controller="Vendor" asp-action="Profile">
-        <i class="bi bi-person-badge"></i><span class="sidebar-label">My Profile &amp; Catalog</span>
+        <i class="bi bi-person-badge"></i><span class="sidebar-label">Vendor Profile</span>
       </a>
       <a class="sidebar-link @(act == "VendorOrders" ? "active" : "")"
          asp-controller="Catalog" asp-action="VendorOrders">
         <i class="bi bi-truck"></i><span class="sidebar-label">My Orders</span>
+      </a>
+      <a class="sidebar-link @(act == "DeliveryTracking" ? "active" : "")"
+         asp-controller="Catalog" asp-action="DeliveryTracking">
+        <i class="bi bi-geo-alt"></i><span class="sidebar-label">Delivery Tracking</span>
       </a>
       }
       else
       {
       <div class="accordion accordion-flush" id="sideAccordion">
 
-        <!-- ★ MODULE 0: DASHBOARD OVERVIEW -->
+        @* ── MODULE 0: DASHBOARD — Admin R | Finance R | Procurement R (User=X, Vendor=X) *@
+        @if (User.IsInRole("Admin") || User.IsInRole("Finance") || User.IsInRole("Procurement"))
+        {
         <a class="sidebar-link @(ctrl == "Dashboard" && act == "Index" ? "active" : "")"
            asp-controller="Dashboard" asp-action="Index">
-          <i class="bi bi-house-door-fill"></i><span class="sidebar-label">Dashboard Overview</span>
+          <i class="bi bi-house-door-fill"></i><span class="sidebar-label">Dashboard</span>
         </a>
-
         <hr class="sidebar-divider mx-3 my-1">
+        }
 
-        <!-- ★ MODULE 1: VENDOR ACCREDITATION -->
+        @* ── MODULE 1: VENDOR ACCREDITATION
+             Accreditation Desk: Admin C,R,U,D | Procurement R,U  (Finance=X, User=X, Vendor=X)
+             Vendor Directory:   Admin C,R,U   | Procurement C,R,U | Finance R | User R (Vendor=X) *@
+        @if (User.IsInRole("Admin") || User.IsInRole("Finance") || User.IsInRole("Procurement") || User.IsInRole("User"))
+        {
         <div class="accordion-item sidebar-module">
           <h2 class="accordion-header">
             <button class="accordion-button sidebar-module-btn @(ctrl == "Vendor" ? "" : "collapsed")"
@@ -71,22 +81,34 @@
           <div id="mod1" class="accordion-collapse collapse @(ctrl == "Vendor" ? "show" : "")"
                data-bs-parent="#sideAccordion">
             <div class="accordion-body p-0">
-              <a class="sidebar-sublink @(act == "Directory" ? "active" : "")"
-                 asp-controller="Vendor" asp-action="Directory">
-                <i class="bi bi-grid-3x2-gap"></i><span class="sidebar-label">Vendor Management</span>
-              </a>
               @if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
               {
               <a class="sidebar-sublink @(act == "AccreditationDesk" ? "active" : "")"
                  asp-controller="Vendor" asp-action="AccreditationDesk">
-                <i class="bi bi-clipboard2-check"></i><span class="sidebar-label">Accreditation Process</span>
+                <i class="bi bi-clipboard2-check"></i><span class="sidebar-label">Vendor Accreditation Desk</span>
+              </a>
+              }
+              @if (User.IsInRole("Admin") || User.IsInRole("Finance") || User.IsInRole("Procurement") || User.IsInRole("User"))
+              {
+              <a class="sidebar-sublink @(act == "Directory" ? "active" : "")"
+                 asp-controller="Vendor" asp-action="Directory">
+                <i class="bi bi-grid-3x2-gap"></i><span class="sidebar-label">Vendor Directory</span>
               </a>
               }
             </div>
           </div>
         </div>
+        }
 
-        <!-- ★ MODULE 2: PURCHASE REQUISITION -->
+        @* ── MODULE 2: PURCHASE REQUISITION
+             Marketplace:       User R  (Admin=X, Finance=X, Procurement=X, Vendor=X)
+             My Requests:       User C,R,U,D(own)  (all others=X)
+             Approval Workflow: Finance R,U  (Admin=X per matrix — Finance approves, not Admin)
+             PO Vault Full:     Admin R | Procurement R,U | Finance R
+             PO Vault Own:      User R(own) | Vendor R,U(own)
+             Delivery Tracking: Admin R | Procurement R,U | User R(own) | Vendor R,U(dispatch) — Finance=X *@
+        @if (User.IsInRole("Finance") || User.IsInRole("Procurement") || User.IsInRole("User") || User.IsInRole("Admin"))
+        {
         <div class="accordion-item sidebar-module">
           <h2 class="accordion-header">
             <button class="accordion-button sidebar-module-btn @(ctrl == "Catalog" ? "" : "collapsed")"
@@ -98,36 +120,68 @@
           <div id="mod2" class="accordion-collapse collapse @(ctrl == "Catalog" ? "show" : "")"
                data-bs-parent="#sideAccordion">
             <div class="accordion-body p-0">
+              @* Marketplace & My Requests: User only *@
               @if (User.IsInRole("User"))
               {
               <a class="sidebar-sublink @(act == "Marketplace" ? "active" : "")"
                  asp-controller="Catalog" asp-action="Marketplace">
                 <i class="bi bi-shop"></i><span class="sidebar-label">Marketplace</span>
               </a>
-              }
               <a class="sidebar-sublink @(act == "MyRequests" ? "active" : "")"
                  asp-controller="Catalog" asp-action="MyRequests">
-                <i class="bi bi-receipt"></i><span class="sidebar-label">Requisition Management</span>
+                <i class="bi bi-receipt"></i><span class="sidebar-label">My Requests</span>
               </a>
-              @if (User.IsInRole("Finance") || User.IsInRole("Admin"))
+              }
+              @* Approval Workflow: Finance only (R,U Approve/Reject) — Admin=X per matrix *@
+              @if (User.IsInRole("Finance"))
               {
               <a class="sidebar-sublink @(act == "ApprovalWorkflow" ? "active" : "")"
                  asp-controller="Catalog" asp-action="ApprovalWorkflow">
                 <i class="bi bi-check2-square"></i><span class="sidebar-label">Approval Workflow</span>
               </a>
               }
+              @* PO Vault Full: Admin R | Procurement R,U *@
               @if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
               {
               <a class="sidebar-sublink @(act == "POVault" ? "active" : "")"
                  asp-controller="Catalog" asp-action="POVault">
-                <i class="bi bi-file-earmark-text"></i><span class="sidebar-label">Purchase Orders</span>
+                <i class="bi bi-file-earmark-text"></i><span class="sidebar-label">PO Vault</span>
+              </a>
+              }
+              @* PO Vault Finance: R only *@
+              @if (User.IsInRole("Finance"))
+              {
+              <a class="sidebar-sublink @(act == "POVault" ? "active" : "")"
+                 asp-controller="Catalog" asp-action="POVault">
+                <i class="bi bi-file-earmark-text"></i><span class="sidebar-label">PO Vault <span class="badge ms-1" style="font-size:.6rem;background:rgba(14,165,233,.15);color:#0369a1">Read</span></span>
+              </a>
+              }
+              @* PO Vault Own Orders: User R(own) *@
+              @if (User.IsInRole("User"))
+              {
+              <a class="sidebar-sublink @(act == "POVault" ? "active" : "")"
+                 asp-controller="Catalog" asp-action="POVault">
+                <i class="bi bi-file-earmark-text"></i><span class="sidebar-label">PO Vault (Own Orders)</span>
+              </a>
+              }
+              @* Delivery Tracking: Admin R | Procurement R,U | User R(own) — Finance=X *@
+              @if (User.IsInRole("Admin") || User.IsInRole("Procurement") || User.IsInRole("User"))
+              {
+              <a class="sidebar-sublink @(act == "DeliveryTracking" ? "active" : "")"
+                 asp-controller="Catalog" asp-action="DeliveryTracking">
+                <i class="bi bi-truck"></i><span class="sidebar-label">Delivery Tracking</span>
               </a>
               }
             </div>
           </div>
         </div>
+        }
 
-        <!-- ★ MODULE 3: SUPPLIER EVALUATION -->
+        @* ── MODULE 3: SUPPLIER EVALUATION
+             Performance Evaluation (View All): Admin R | Procurement R,U | Finance R  (User=X, Vendor=X)
+             Leaderboard:                       Admin R | Procurement R   | Finance R  (User=X, Vendor=X) *@
+        @if (User.IsInRole("Admin") || User.IsInRole("Finance") || User.IsInRole("Procurement"))
+        {
         <div class="accordion-item sidebar-module">
           <h2 class="accordion-header">
             <button class="accordion-button sidebar-module-btn @(ctrl == "Evaluation" ? "" : "collapsed")"
@@ -145,59 +199,76 @@
               </a>
               <a class="sidebar-sublink @(act == "Leaderboard" ? "active" : "")"
                  asp-controller="Evaluation" asp-action="Leaderboard">
-                <i class="bi bi-trophy"></i><span class="sidebar-label">Scoring &amp; Rating</span>
+                <i class="bi bi-trophy"></i><span class="sidebar-label">Leaderboard</span>
               </a>
             </div>
           </div>
         </div>
+        }
 
-        <!-- ★ MODULE 4: CONTRACT MANAGEMENT -->
-        <div class="accordion-item sidebar-module">
-          <h2 class="accordion-header">
-            <button class="accordion-button sidebar-module-btn @(ctrl == "Contract" ? "" : "collapsed")"
-                    type="button" data-bs-toggle="collapse" data-bs-target="#mod4">
-              <i class="bi bi-file-earmark-ruled me-2"></i>
-              <span class="sidebar-label">Contract Management</span>
-            </button>
-          </h2>
-          <div id="mod4" class="accordion-collapse collapse @(ctrl == "Contract" ? "show" : "")"
-               data-bs-parent="#sideAccordion">
-            <div class="accordion-body p-0">
-              <a class="sidebar-sublink @(act == "Pricing" ? "active" : "")"
-                 asp-controller="Contract" asp-action="Pricing">
-                <i class="bi bi-currency-exchange"></i><span class="sidebar-label">Pricing Management</span>
-              </a>
-            </div>
-          </div>
-        </div>
-
+        @* ── MODULE 4: CONTRACT MANAGEMENT — Admin C,R,U,D | Procurement C,R,U | Finance R (User=X, Vendor=X) *@
         @if (User.IsInRole("Admin") || User.IsInRole("Finance") || User.IsInRole("Procurement"))
         {
-        <!-- ★ MODULE 5: PROCUREMENT ANALYTICS -->
+        <a class="sidebar-link @(ctrl == "Contract" ? "active" : "")"
+           asp-controller="Contract" asp-action="Lifecycle">
+          <i class="bi bi-file-earmark-ruled"></i><span class="sidebar-label">Contract Management</span>
+        </a>
+        }
+
+        @* ── MODULE 5: PROCUREMENT ANALYTICS — Admin R | Finance R | Procurement R (User=X, Vendor=X) *@
+        @if (User.IsInRole("Admin") || User.IsInRole("Finance") || User.IsInRole("Procurement"))
+        {
         <div class="accordion-item sidebar-module">
           <h2 class="accordion-header">
-            <button class="accordion-button sidebar-module-btn @(ctrl == "Dashboard" && act != "Index" ? "" : "collapsed")"
+            @{ var mod5Active = (ctrl == "Dashboard" && act != "Index") || act == "Benchmarking"; }
+            <button class="accordion-button sidebar-module-btn @(mod5Active ? "" : "collapsed")"
                     type="button" data-bs-toggle="collapse" data-bs-target="#mod5">
               <i class="bi bi-speedometer2 me-2"></i>
               <span class="sidebar-label">Procurement Analytics</span>
             </button>
           </h2>
-          <div id="mod5" class="accordion-collapse collapse @(ctrl == "Dashboard" && act != "Index" ? "show" : "")"
+          <div id="mod5" class="accordion-collapse collapse @(mod5Active ? "show" : "")"
                data-bs-parent="#sideAccordion">
             <div class="accordion-body p-0">
               <a class="sidebar-sublink @(act == "Reports" ? "active" : "")"
                  asp-controller="Dashboard" asp-action="Reports">
                 <i class="bi bi-file-bar-graph"></i><span class="sidebar-label">Reports &amp; Insights</span>
               </a>
+              @* Budget Management: Finance only (Admin=X per matrix) *@
+              @if (User.IsInRole("Finance"))
+              {
+              <a class="sidebar-sublink @(act == "BudgetManagement" ? "active" : "")"
+                 asp-controller="Dashboard" asp-action="BudgetManagement">
+                <i class="bi bi-wallet2"></i><span class="sidebar-label">Budget Management</span>
+              </a>
+              }
+              @* Benchmarking: Admin R | Finance R | Procurement R *@
+              <a class="sidebar-sublink @(act == "Benchmarking" ? "active" : "")"
+                 asp-controller="Evaluation" asp-action="Benchmarking">
+                <i class="bi bi-radar"></i><span class="sidebar-label">Benchmarking</span>
+              </a>
+              @* Financial Audit Trail: Admin R | Finance R (Procurement=X) *@
+              @if (User.IsInRole("Admin") || User.IsInRole("Finance"))
+              {
+              <a class="sidebar-sublink @(act == "AuditTrail" ? "active" : "")"
+                 asp-controller="Dashboard" asp-action="AuditTrail">
+                <i class="bi bi-shield-lock-fill"></i><span class="sidebar-label">Financial Audit Trail</span>
+              </a>
+              }
+              @* SLA Milestone Logs: Admin R | Finance R | Procurement R *@
+              <a class="sidebar-sublink @(act == "SLALogs" ? "active" : "")"
+                 asp-controller="Dashboard" asp-action="SLALogs">
+                <i class="bi bi-alarm"></i><span class="sidebar-label">SLA Milestone Logs</span>
+              </a>
             </div>
           </div>
         </div>
-        } @* end AnalyticsViewers block *@
+        }
 
+        @* ── MODULE 6: USER MANAGEMENT — Admin C,R,U,D only *@
         @if (User.IsInRole("Admin"))
         {
         <hr class="sidebar-divider mx-3 my-1">
-        <!-- ★ MODULE 6: USER MANAGEMENT (Admin Only) -->
         <a class="sidebar-link @(ctrl == "UserManagement" ? "active" : "")"
            asp-controller="UserManagement" asp-action="Index">
           <i class="bi bi-people-fill"></i><span class="sidebar-label">User Management</span>
@@ -261,13 +332,14 @@
           <span class="d-none d-md-inline text-truncate" style="max-width:120px">@User.Identity.Name</span>
           <span class="topbar-role-badge role-@roleVal">@roleVal</span>
         </div>
-        <!-- Logout -->
-        <form asp-controller="Auth" asp-action="Logout" method="post" class="m-0">
+        <!-- Logout (intercepted by custom modal) -->
+        <form id="globalLogoutForm" asp-controller="Auth" asp-action="Logout" method="post" class="m-0" style="display:none">
           @Html.AntiForgeryToken()
-          <button type="submit" class="btn btn-sm" style="background:#fee2e2;border:1px solid #fecaca;border-radius:8px;width:36px;height:36px;padding:0;color:#dc2626" title="Sign Out">
-            <i class="bi bi-box-arrow-right"></i>
-          </button>
         </form>
+        <button type="button" class="btn btn-sm" onclick="openLogoutModal()"
+                style="background:#fee2e2;border:1px solid #fecaca;border-radius:8px;width:36px;height:36px;padding:0;color:#dc2626" title="Sign Out">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
       </div>
     </header>
 
@@ -304,12 +376,115 @@
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="~/js/provms.js?v=20260521f"></script>
+<script src="~/js/provms.js?v=20260521g"></script>
 <script>
   document.getElementById('sidebarToggle')?.addEventListener('click', function () {
     document.getElementById('provmsSidebar').classList.toggle('collapsed');
   });
 </script>
 @await RenderSectionAsync("Scripts", required: false)
+
+<!-- ── LOGOUT CONFIRMATION MODAL ─────────────────────────────────────── -->
+<div id="logoutModal" style="display:none;position:fixed;inset:0;z-index:10000;backdrop-filter:blur(4px);background:rgba(15,23,42,0.6);align-items:center;justify-content:center">
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;box-shadow:0 25px 60px rgba(0,0,0,0.6);width:100%;max-width:420px;margin:auto;padding:2rem">
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <div style="background:#ef444422;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="bi bi-box-arrow-right" style="font-size:1.3rem;color:#ef4444"></i>
+      </div>
+      <div>
+        <h5 class="mb-0 fw-bold text-white">End Active Session?</h5>
+        <small style="color:#94a3b8">You will need to re-authenticate</small>
+      </div>
+    </div>
+    <p style="color:#94a3b8;font-size:.875rem;line-height:1.6;margin-bottom:1.5rem">
+      Are you sure you want to log out of ProVMS? You will need to re-authenticate to review your notification hubs or manage active workflows.
+    </p>
+    <div class="d-flex gap-2 justify-content:end justify-content-end">
+      <button type="button"
+              style="border:1px solid #475569;color:#94a3b8;background:transparent;border-radius:8px;padding:.5rem 1.25rem;font-weight:600;transition:background .2s"
+              onmouseenter="this.style.background='#334155'" onmouseleave="this.style.background='transparent'"
+              onclick="closeLogoutModal()">Stay</button>
+      <button type="button" id="logoutCommitBtn"
+              style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:.5rem 1.5rem;font-weight:600;transition:background .2s"
+              onmouseenter="this.style.background='#dc2626'" onmouseleave="this.style.background='#ef4444'"
+              onclick="commitLogout()">
+        <i class="bi bi-box-arrow-right me-1"></i>Log Out
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DISCARD DRAFT MODAL ───────────────────────────────────────────── -->
+<div id="discardModal" style="display:none;position:fixed;inset:0;z-index:10000;backdrop-filter:blur(4px);background:rgba(15,23,42,0.6);align-items:center;justify-content:center">
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;box-shadow:0 25px 60px rgba(0,0,0,0.6);width:100%;max-width:420px;margin:auto;padding:2rem">
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <div style="background:#f59e0b22;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="bi bi-exclamation-triangle" style="font-size:1.3rem;color:#f59e0b"></i>
+      </div>
+      <div>
+        <h5 class="mb-0 fw-bold text-white">Discard Draft Data?</h5>
+        <small style="color:#94a3b8">This action cannot be undone</small>
+      </div>
+    </div>
+    <p style="color:#94a3b8;font-size:.875rem;line-height:1.6;margin-bottom:1.5rem">
+      Warning: Exiting this panel will completely clear your active line entries. This action cannot be undone.
+    </p>
+    <div class="d-flex gap-2 justify-content-end">
+      <button type="button"
+              style="border:1px solid #475569;color:#94a3b8;background:transparent;border-radius:8px;padding:.5rem 1.25rem;font-weight:600;transition:background .2s"
+              onmouseenter="this.style.background='#334155'" onmouseleave="this.style.background='transparent'"
+              onclick="closeDiscardModal()">Cancel</button>
+      <button type="button" id="discardCommitBtn"
+              style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:.5rem 1.5rem;font-weight:600;transition:background .2s"
+              onmouseenter="this.style.background='#dc2626'" onmouseleave="this.style.background='#ef4444'"
+              onclick="commitDiscard()">
+        <i class="bi bi-trash me-1"></i>Discard
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _discardTarget = null;
+
+function openLogoutModal() {
+  document.getElementById('logoutModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  document.getElementById('logoutCommitBtn').focus();
+}
+function closeLogoutModal() {
+  document.getElementById('logoutModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+function commitLogout() {
+  var btn = document.getElementById('logoutCommitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Signing out…';
+  document.getElementById('globalLogoutForm').submit();
+}
+
+function openDiscardModal(targetHref) {
+  _discardTarget = targetHref;
+  document.getElementById('discardModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  document.getElementById('discardCommitBtn').focus();
+}
+function closeDiscardModal() {
+  document.getElementById('discardModal').style.display = 'none';
+  document.body.style.overflow = '';
+  _discardTarget = null;
+}
+function commitDiscard() {
+  if (_discardTarget) window.location.href = _discardTarget;
+}
+
+// Focus trap: backdrop click does NOT close either modal
+document.addEventListener('DOMContentLoaded', function () {
+  ['logoutModal','discardModal'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', function(e) { if (e.target === this) e.stopPropagation(); });
+  });
+});
+</script>
 </body>
 </html>

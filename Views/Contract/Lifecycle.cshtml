@@ -12,9 +12,12 @@
                 <small class="opacity-75">Manage all vendor contracts from draft to termination</small>
             </div>
         </div>
+        @if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
+        {
         <button class="btn btn-warning fw-semibold" data-bs-toggle="modal" data-bs-target="#newContractModal">
             <i class="bi bi-plus-circle me-1"></i>New Contract
         </button>
+        }
     </div>
 </div>
 
@@ -52,13 +55,16 @@
                     <th>Start</th>
                     <th>End</th>
                     <th>Status</th>
+                    @if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
+                    {
                     <th>Action</th>
+                    }
                 </tr>
             </thead>
             <tbody>
                 @if (!Model.Any())
                 {
-                <tr><td colspan="8" class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No contracts found.</td></tr>
+                <tr><td colspan="@(User.IsInRole("Admin") || User.IsInRole("Procurement") ? 8 : 7)" class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No contracts found.</td></tr>
                 }
                 @foreach (var c in Model)
                 {
@@ -78,6 +84,8 @@
                     <td class="small">@c.StartDate.ToString("MMM dd, yyyy")</td>
                     <td class="small">@c.EndDate.ToString("MMM dd, yyyy")</td>
                     <td><span class="status-badge @statusCls">@c.Status.ToString().Replace("UnderNegotiation","Negotiation")</span></td>
+                    @if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
+                    {
                     <td>
                         <form asp-action="UpdateStatus" method="post" class="d-flex gap-1">
                             @Html.AntiForgeryToken()
@@ -98,6 +106,7 @@
                             <button class="btn btn-sm btn-primary">Update</button>
                         </form>
                     </td>
+                    }
                 </tr>
                 }
             </tbody>
@@ -105,6 +114,9 @@
     </div>
 </div>
 
+@* New Contract Modal — Admin C,R,U,D | Procurement C,R,U — Finance=R only, modal hidden *@
+@if (User.IsInRole("Admin") || User.IsInRole("Procurement"))
+{
 <!-- New Contract Modal -->
 <div class="modal fade" id="newContractModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -147,3 +159,4 @@
         </div>
     </div>
 </div>
+}

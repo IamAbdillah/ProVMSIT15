@@ -15,17 +15,19 @@ public class VendorController : Controller
     private readonly NotificationService _notif;
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
+    private readonly AuditService _audit;
 
     public VendorController(ApplicationDbContext db, NotificationService notif,
-        IConfiguration config, IWebHostEnvironment env)
+        IConfiguration config, IWebHostEnvironment env, AuditService audit)
     {
         _db = db;
         _notif = notif;
         _config = config;
         _env = env;
+        _audit = audit;
     }
 
-    [HttpGet, Authorize(Policy = "ProcurementOrAdmin")]
+    [HttpGet, Authorize(Policy = "AnalyticsViewers")]
     public async Task<IActionResult> EvaluationDesk()
     {
         ViewData["Title"] = "Vendor Evaluation";
@@ -127,6 +129,9 @@ public class VendorController : Controller
             await _db.SaveChangesAsync();
         }
 
+        // SLA: VendorOnboarding timer starts on submission (48h limit)
+        await _audit.OpenSLAAsync(SLAWorkflowType.VendorOnboarding, vendor.ID);
+
         await _notif.SendToRoleAsync(UserRole.Admin, $"New vendor '{vendor.CompanyName}' submitted for accreditation.");
         await _notif.SendToRoleAsync(UserRole.Procurement, $"New vendor '{vendor.CompanyName}' pending review.");
 
@@ -162,6 +167,11 @@ public class VendorController : Controller
         vendor.ApprovedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
+        // AUDIT + SLA: VendorOnboarding closes (48h limit)
+        await _audit.LogTransactionAsync("Vendor_Approved", vendor.ID,
+            payloadAfter: new { vendor.ID, vendor.CompanyName, Status = "Active", ApprovedAt = vendor.ApprovedAt });
+        await _audit.CloseSLAAsync(SLAWorkflowType.VendorOnboarding, vendor.ID, 48m);
+
         if (vendor.LinkedUserID.HasValue)
             await _notif.SendAsync(vendor.LinkedUserID.Value, "Your vendor account has been approved. Welcome to ProVMS!");
 
@@ -177,9 +187,14 @@ public class VendorController : Controller
         var vendor = await _db.Vendors.FindAsync(id);
         if (vendor == null) return NotFound();
 
-        vendor.OperationalStatus = OperationalStatus.Blacklisted;
+        vendor.OperationalStatus = OperationalStatus.Suspended;
         vendor.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+
+        // AUDIT + SLA: VendorOnboarding closes on rejection
+        await _audit.LogTransactionAsync("Vendor_Rejected", vendor.ID,
+            payloadAfter: new { vendor.ID, vendor.CompanyName, Status = "Blacklisted", RejectedAt = DateTime.UtcNow });
+        await _audit.CloseSLAAsync(SLAWorkflowType.VendorOnboarding, vendor.ID, 48m);
 
         if (vendor.LinkedUserID.HasValue)
             await _notif.SendAsync(vendor.LinkedUserID.Value, "Your vendor application was not approved. Contact procurement for details.");
@@ -252,7 +267,7 @@ public class VendorController : Controller
     }
 
     [HttpPost]
-    [Authorize(Policy = "ProcurementOrAdmin")]
+    [Authorize(Policy = "AdminOnly")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateStatus(int id, string newStatus)
     {

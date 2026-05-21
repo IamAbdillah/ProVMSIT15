@@ -26,6 +26,8 @@ public class AppUser
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public bool IsArchived { get; set; } = false;
+
     public ICollection<PurchaseRequisition> Requisitions { get; set; } = new List<PurchaseRequisition>();
     public ICollection<InAppNotification> Notifications { get; set; } = new List<InAppNotification>();
 }

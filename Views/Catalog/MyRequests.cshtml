@@ -3,7 +3,6 @@
     ViewData["Title"] = "Requisition Management";
     ViewData["BreadcrumbModule"] = "Purchase Requisition";
     var currentUserId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-    var isInternal = User.IsInRole("Admin") || User.IsInRole("Procurement") || User.IsInRole("Finance");
 }
 <div class="provms-page-header">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -51,6 +50,47 @@
                 <div><div class="stat-label">Total Spend</div><div class="stat-value mt-1" style="font-size:1.2rem">&#8369;@Model.Where(r => r.WorkflowStatus != WorkflowStatus.Archived).Sum(r => r.TotalCalculatedAmount).ToString("N0")</div></div>
                 <i class="bi bi-cash-stack stat-icon"></i>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── MATERIAL RECEIPT CONFIRMATION MODAL ─────────────────────────── -->
+<div id="receiptModal" style="display:none;position:fixed;inset:0;z-index:9999;backdrop-filter:blur(4px);background:rgba(15,23,42,0.6);align-items:center;justify-content:center">
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;box-shadow:0 25px 60px rgba(0,0,0,0.6);width:100%;max-width:480px;margin:auto;padding:2rem;position:relative">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <div style="background:#f59e0b22;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <i class="bi bi-box-seam" style="font-size:1.3rem;color:#f59e0b"></i>
+            </div>
+            <div>
+                <h5 class="mb-0 fw-bold text-white">Confirm Material Receipt</h5>
+                <small style="color:#94a3b8">This action cannot be undone</small>
+            </div>
+        </div>
+        <p style="color:#94a3b8;font-size:.9rem;line-height:1.6;margin-bottom:.5rem">
+            You are confirming physical receipt of:
+        </p>
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem">
+            <div class="fw-semibold text-white" id="modalReqId" style="font-size:.85rem;font-family:monospace"></div>
+            <div style="color:#94a3b8;font-size:.85rem" id="modalItemName"></div>
+            <div style="color:#64748b;font-size:.8rem" id="modalVendorName"></div>
+        </div>
+        <p style="color:#f59e0b;font-size:.82rem;background:#f59e0b11;border:1px solid #f59e0b33;border-radius:6px;padding:.6rem .9rem;margin-bottom:1.5rem">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            After confirming, you will be <strong>required to complete a mandatory supplier evaluation</strong> before this transaction is closed.
+        </p>
+        <div class="d-flex gap-2 justify-content-end">
+            <button type="button" id="modalCancelBtn"
+                    style="border:1px solid #475569;color:#94a3b8;background:transparent;border-radius:8px;padding:.5rem 1.25rem;font-weight:600;transition:background .2s"
+                    onmouseenter="this.style.background='#1e293b'" onmouseleave="this.style.background='transparent'"
+                    onclick="closeReceiptModal()">
+                Cancel
+            </button>
+            <button type="button" id="modalConfirmBtn"
+                    style="background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:.5rem 1.5rem;font-weight:600;transition:background .2s"
+                    onmouseenter="this.style.background='#4338ca'" onmouseleave="this.style.background='#4f46e5'"
+                    onclick="submitReceiptForm()">
+                <i class="bi bi-check-lg me-1"></i>Confirm Receipt
+            </button>
         </div>
     </div>
 </div>
@@ -125,14 +165,14 @@ else
                     <td>
                         @if (req.WorkflowStatus == WorkflowStatus.In_Transit && req.RequesterID == currentUserId)
                         {
-                        <form asp-controller="Catalog" asp-action="MarkDelivered" method="post">
+                        <form id="receiptForm_@req.ID" asp-controller="Catalog" asp-action="ConfirmReceipt" method="post" style="display:none">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@req.ID" />
-                            <button type="submit" class="btn-approve btn btn-sm fw-semibold"
-                                    onclick="return confirm('Confirm material receipt for REQ-@req.ID.ToString("D4")? You will be required to complete a mandatory evaluation.')">
-                                <i class="bi bi-box-seam me-1"></i>Confirm Receipt
-                            </button>
                         </form>
+                        <button type="button" class="btn-approve btn btn-sm fw-semibold"
+                                onclick="openReceiptModal('@req.ID', 'REQ-@req.ID.ToString("D4")', '@req.Item?.ItemName', '@req.Item?.Vendor?.CompanyName')">
+                            <i class="bi bi-box-seam me-1"></i>Confirm Material Receipt
+                        </button>
                         }
                         else if (req.WorkflowStatus == WorkflowStatus.Delivered && req.Evaluation == null && req.RequesterID == currentUserId)
                         {
@@ -146,16 +186,6 @@ else
                         {
                         <span class="text-success small"><i class="bi bi-check-circle-fill me-1"></i>Reviewed</span>
                         }
-                        else if (isInternal && req.WorkflowStatus == WorkflowStatus.In_Transit)
-                        {
-                        <form asp-controller="Catalog" asp-action="MarkDelivered" method="post">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@req.ID" />
-                            <button type="submit" class="btn-approve btn btn-sm">
-                                <i class="bi bi-check-lg me-1"></i>Mark Delivered
-                            </button>
-                        </form>
-                        }
                         else
                         {
                         <span class="text-muted small">—</span>
@@ -167,4 +197,42 @@ else
         </table>
     </div>
 </div>
+}
+
+@section Scripts {
+<script>
+var _activeReceiptFormId = null;
+
+function openReceiptModal(reqId, reqLabel, itemName, vendorName) {
+    _activeReceiptFormId = 'receiptForm_' + reqId;
+    document.getElementById('modalReqId').textContent      = reqLabel;
+    document.getElementById('modalItemName').textContent   = itemName;
+    document.getElementById('modalVendorName').textContent = vendorName;
+    var modal = document.getElementById('receiptModal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('modalConfirmBtn').focus();
+}
+
+function closeReceiptModal() {
+    document.getElementById('receiptModal').style.display = 'none';
+    document.body.style.overflow = '';
+    _activeReceiptFormId = null;
+}
+
+function submitReceiptForm() {
+    if (_activeReceiptFormId) {
+        var btn = document.getElementById('modalConfirmBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing\u2026';
+        document.getElementById(_activeReceiptFormId).submit();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('receiptModal').addEventListener('click', function (e) {
+        if (e.target === this) e.stopPropagation();
+    });
+});
+</script>
 }

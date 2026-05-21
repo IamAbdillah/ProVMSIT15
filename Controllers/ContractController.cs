@@ -6,14 +6,13 @@ using ProVMSIT15.Models;
 
 namespace ProVMSIT15.Controllers;
 
-[Authorize]
+[Authorize(Policy = "AnalyticsViewers")]
 public class ContractController : Controller
 {
     private readonly ApplicationDbContext _db;
     public ContractController(ApplicationDbContext db) { _db = db; }
 
     // ── CONTRACT LIFECYCLE ──────────────────────────────────────
-    [Authorize(Policy = "ProcurementOrAdmin")]
     public async Task<IActionResult> Lifecycle()
     {
         ViewData["Title"] = "Contract Lifecycle";
@@ -32,25 +31,16 @@ public class ContractController : Controller
         ViewData["Title"] = "Pricing Management";
         ViewData["BreadcrumbModule"] = "Contract Management";
 
-        IQueryable<Contract> query = _db.Contracts
+        var contracts = await _db.Contracts
             .Include(c => c.Vendor)
             .Include(c => c.Items)
-                .ThenInclude(ci => ci.VendorItem);
-
-        if (User.IsInRole("Vendor"))
-        {
-            var email = User.Identity!.Name;
-            var vendor = await _db.Vendors.FirstOrDefaultAsync(v => v.ContactEmail == email);
-            if (vendor == null) return Forbid();
-            query = query.Where(c => c.VendorID == vendor.ID);
-        }
-
-        var contracts = await query.OrderByDescending(c => c.CreatedAt).ToListAsync();
+                .ThenInclude(ci => ci.VendorItem)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
         return View(contracts);
     }
 
     // ── NEGOTIATIONS ────────────────────────────────────────────
-    [Authorize(Policy = "ProcurementOrAdmin")]
     public async Task<IActionResult> Negotiations()
     {
         ViewData["Title"] = "Negotiations";
@@ -63,7 +53,7 @@ public class ContractController : Controller
         return View(contracts);
     }
 
-    // ── CREATE CONTRACT (POST) ───────────────────────────────────
+    // ── CREATE CONTRACT (POST) — C,U: ProcurementOrAdmin only ──
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = "ProcurementOrAdmin")]
     public async Task<IActionResult> Create(int vendorId, string title, DateTime startDate, DateTime endDate, decimal discount, string? notes)
     {
@@ -87,7 +77,7 @@ public class ContractController : Controller
         return RedirectToAction("Lifecycle");
     }
 
-    // ── UPDATE STATUS (POST) ─────────────────────────────────────
+    // ── UPDATE STATUS (POST) — U: ProcurementOrAdmin only ──────
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = "ProcurementOrAdmin")]
     public async Task<IActionResult> UpdateStatus(int id, ContractStatus status)
     {

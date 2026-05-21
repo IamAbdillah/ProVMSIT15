@@ -18,7 +18,6 @@ public class DashboardController : Controller
     }
 
     [HttpGet]
-    [Authorize(Policy = "InternalUsers")]
     public async Task<IActionResult> Index()
     {
         var expensesByDept = await _db.PurchaseRequisitions
@@ -62,6 +61,14 @@ public class DashboardController : Controller
         ViewBag.PendingReqs = pendingReqs;
         ViewBag.TotalReqs = totalReqs;
 
+        // SLA Compliance Stats for dashboard widget
+        var slaLogs = await _db.SLAMilestoneLogs.ToListAsync();
+        ViewBag.SLATotal     = slaLogs.Count;
+        ViewBag.SLACompliant = slaLogs.Count(s => s.SLABreachStatus == SLABreachStatus.Compliant && s.EndTimestamp != null);
+        ViewBag.SLABreached  = slaLogs.Count(s => s.SLABreachStatus == SLABreachStatus.Breached);
+        ViewBag.SLAOpen      = slaLogs.Count(s => s.EndTimestamp == null);
+        ViewBag.AuditEntries = await _db.FinancialAuditTrails.CountAsync();
+
         return View();
     }
 
@@ -103,6 +110,32 @@ public class DashboardController : Controller
         ViewBag.CategoryLabels = byCategory.Select(c => c.Category).ToList();
         ViewBag.CategoryValues = byCategory.Select(c => c.Total).ToList();
         return View();
+    }
+
+    [HttpGet]
+    [Authorize(Policy = "FinanceOrAdmin")]
+    public async Task<IActionResult> AuditTrail()
+    {
+        ViewData["Title"] = "Financial Audit Trail";
+        ViewData["BreadcrumbModule"] = "Procurement Analytics";
+        var logs = await _db.FinancialAuditTrails
+            .Include(a => a.Actor)
+            .OrderByDescending(a => a.SystemTimestamp)
+            .Take(500)
+            .ToListAsync();
+        return View(logs);
+    }
+
+    [HttpGet]
+    [Authorize(Policy = "AnalyticsViewers")]
+    public async Task<IActionResult> SLALogs()
+    {
+        ViewData["Title"] = "SLA Milestone Logs";
+        ViewData["BreadcrumbModule"] = "Procurement Analytics";
+        var logs = await _db.SLAMilestoneLogs
+            .OrderByDescending(s => s.StartTimestamp)
+            .ToListAsync();
+        return View(logs);
     }
 
     [HttpPost]

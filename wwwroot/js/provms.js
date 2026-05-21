@@ -3,6 +3,51 @@
 // =============================================
 // NOTIFICATION BELL HUB
 // =============================================
+// Maps notification text patterns → destination URL for the walkthrough
+function resolveNotifUrl(text) {
+    const t = text.toLowerCase();
+    // Step 1 — Vendor onboarding
+    if (t.includes('submitted for accreditation') || t.includes('pending review') && t.includes('vendor'))
+        return '/Vendor/AccreditationDesk';
+    // Step 2 — Vendor approved/rejected → vendor goes to their orders
+    if (t.includes('vendor account has been approved') || t.includes('application was not approved'))
+        return '/Catalog/VendorOrders';
+    // Step 3 — PR requires finance clearance
+    if (t.includes('budget clearance review') || t.includes('requires immediate budget'))
+        return '/Catalog/ApprovalWorkflow';
+    // Step 3 — Juan's own submission confirmation
+    if (t.includes('pre-encumbered') && t.includes('awaiting finance'))
+        return '/Catalog/MyRequests';
+    // Step 3 — Budget exceeded block
+    if (t.includes('blocked') && t.includes('budget'))
+        return '/Catalog/Marketplace';
+    // Step 4 — Ben notified: PO ready to issue
+    if (t.includes('approved by finance') || t.includes('issue purchase order now'))
+        return '/Catalog/POVault';
+    // Step 4 — Juan notified: budget approved
+    if (t.includes('budget approved') || t.includes('procurement will issue'))
+        return '/Catalog/MyRequests';
+    // Step 4 — Juan notified: PR rejected
+    if (t.includes('rejected by finance'))
+        return '/Catalog/MyRequests';
+    // Step 5 — Emma notified: PO issued to vendor
+    if (t.includes('purchase order') && t.includes('issued to you'))
+        return '/Catalog/VendorOrders';
+    // Step 5 — Juan notified: PO issued, awaiting delivery
+    if (t.includes('issued') && t.includes('awaiting delivery'))
+        return '/Catalog/MyRequests';
+    // Step 6 — Juan notified: order in transit
+    if (t.includes('in transit'))
+        return '/Catalog/MyRequests';
+    // Step 7 — Juan notified: confirm receipt / evaluation
+    if (t.includes('confirmed received') || t.includes('confirmed receipt') || t.includes('submit your evaluation'))
+        return '/Catalog/MyRequests';
+    // Role update
+    if (t.includes('system role has been updated'))
+        return '/Dashboard/Index';
+    return null;
+}
+
 async function loadNotifications() {
     try {
         const res = await fetch('/api/Notifications/list', { credentials: 'include' });
@@ -12,12 +57,32 @@ async function loadNotifications() {
             list.innerHTML = '<div class="text-center text-muted py-4 small"><i class="bi bi-bell-slash fs-4 d-block mb-2"></i>No notifications</div>';
             return;
         }
-        list.innerHTML = notes.map(n => `
-            <div class="notif-item ${!n.isRead ? 'unread' : ''}" id="notif-${n.id}" onclick="markRead(${n.id})">
+        list.innerHTML = notes.map(n => {
+            const url = resolveNotifUrl(n.notificationText);
+            const inner = `
                 <div>${n.notificationText}</div>
-                <div class="notif-time"><i class="bi bi-clock me-1"></i>${formatTime(n.createdAt)}</div>
-            </div>`).join('');
+                <div class="notif-time"><i class="bi bi-clock me-1"></i>${formatTime(n.createdAt)}${
+                    url ? ' <i class="bi bi-arrow-right-short ms-1" style="color:#6366f1"></i>' : ''
+                }</div>`;
+            if (url) {
+                return `<div class="notif-item ${!n.isRead ? 'unread' : ''}" id="notif-${n.id}" style="cursor:pointer"
+                    onclick="notifNavigate(event,${n.id},'${url}')">${inner}</div>`;
+            }
+            return `<div class="notif-item ${!n.isRead ? 'unread' : ''}" id="notif-${n.id}" onclick="markRead(${n.id})">${inner}</div>`;
+        }).join('');
     } catch (e) { console.warn('Notifications unavailable'); }
+}
+
+function notifNavigate(e, id, url) {
+    e.stopPropagation();
+    // Fire mark-read in background — don't await, navigate immediately
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+    fetch(`/api/Notifications/mark-read/${id}`, {
+        method: 'POST',
+        headers: { 'RequestVerificationToken': token || '' },
+        credentials: 'include'
+    });
+    window.location.href = url;
 }
 
 async function markRead(id) {

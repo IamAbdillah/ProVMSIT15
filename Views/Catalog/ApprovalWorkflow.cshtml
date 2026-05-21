@@ -84,7 +84,7 @@ else
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="id" value="@req.ID" />
                                 <button type="submit" class="btn-approve btn btn-sm">
-                                    <i class="bi bi-check-lg me-1"></i>Approve
+                                    <i class="bi bi-check-lg me-1"></i>Approve Expenditure
                                 </button>
                             </form>
                             <form asp-controller="Catalog" asp-action="RejectRequisition" method="post">

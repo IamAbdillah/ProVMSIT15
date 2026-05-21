@@ -58,7 +58,7 @@
     <div class="card-section-header">
         <i class="bi bi-table text-primary"></i>
         <h6>Internal User Registry</h6>
-        <span class="badge ms-auto" style="background:#f1f5f9;color:#475569;font-size:.72rem">Vendors excluded — public portal only</span>
+        <span class="badge ms-auto" style="background:#f1f5f9;color:#475569;font-size:.72rem">Vendors excluded — public portal only · Deactivated accounts are archived, not deleted</span>
     </div>
     <div class="table-responsive">
         <table class="table provms-table mb-0">
@@ -104,7 +104,7 @@
                     <td><span class="badge bg-light text-dark border">@(u.DepartmentCode ?? "—")</span></td>
                     <td class="small">@u.CreatedAt.ToString("MMM dd, yyyy")</td>
                     <td>
-                        <form asp-action="UpdateRole" method="post" class="d-flex gap-1">
+                        <form asp-action="UpdateRole" method="post" class="d-flex gap-1 align-items-center flex-wrap">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@u.ID" />
                             <select name="role" class="form-select form-select-sm" style="width:auto">
@@ -114,14 +114,22 @@
                                     else { <option value="@r">@r</option> }
                                 }
                             </select>
+                            <select name="departmentCode" class="form-select form-select-sm" style="width:auto" title="Department Code">
+                                <option value="">— Dept —</option>
+                                @foreach (var dept in new[] { "IT", "HR", "FINANCE", "OPS", "PROCUREMENT", "SYS" })
+                                {
+                                    if (u.DepartmentCode == dept) { <option value="@dept" selected>@dept</option> }
+                                    else { <option value="@dept">@dept</option> }
+                                }
+                            </select>
                             <button class="btn btn-sm btn-primary">Save</button>
                         </form>
                     </td>
                     <td>
-                        <form asp-action="Deactivate" method="post" onsubmit="return confirm('Remove @u.FullName from the system?')">
+                        <form asp-action="Deactivate" method="post" onsubmit="return confirm('Archive @u.FullName? Their record will be preserved for audit purposes but they will no longer be able to log in.')">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@u.ID" />
-                            <button class="btn-reject btn btn-sm"><i class="bi bi-person-x"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" title="Archive User"><i class="bi bi-archive"></i></button>
                         </form>
                     </td>
                 </tr>

@@ -60,6 +60,53 @@
         </div>
     </div>
 
+    @* SLA Compliance & Audit Monitor *@
+    <div class="provms-card mb-4 p-0">
+        <div class="card-section-header">
+            <i class="bi bi-shield-check text-success"></i>
+            <h6>SLA Compliance Monitor &amp; Audit Ledger</h6>
+            <span class="badge ms-auto" style="background:rgba(5,150,105,.12);color:#065f46">Live</span>
+        </div>
+        <div class="row g-0">
+            <div class="col-6 col-xl-3 p-3 border-end">
+                <div class="provms-subtext text-uppercase mb-1">Open SLAs</div>
+                <div class="fw-bold" style="font-size:28px;color:var(--brand-light)">@ViewBag.SLAOpen</div>
+                <div class="provms-subtext">In progress</div>
+            </div>
+            <div class="col-6 col-xl-3 p-3 border-end">
+                <div class="provms-subtext text-uppercase mb-1">Compliant</div>
+                <div class="fw-bold" style="font-size:28px;color:var(--success)">@ViewBag.SLACompliant</div>
+                <div class="provms-subtext">Closed on time</div>
+            </div>
+            <div class="col-6 col-xl-3 p-3 border-end">
+                <div class="provms-subtext text-uppercase mb-1">SLA Breaches</div>
+                <div class="fw-bold" style="font-size:28px;color:var(--danger)">@ViewBag.SLABreached</div>
+                <div class="provms-subtext">Exceeded time limit</div>
+            </div>
+            <div class="col-6 col-xl-3 p-3">
+                <div class="provms-subtext text-uppercase mb-1">Audit Entries</div>
+                <div class="fw-bold" style="font-size:28px;color:var(--brand)">@ViewBag.AuditEntries</div>
+                <div class="provms-subtext">Immutable ledger rows</div>
+            </div>
+        </div>
+        @{
+            int slaTotal = (int)ViewBag.SLATotal;
+            int slaCompliant = (int)ViewBag.SLACompliant;
+            int slaBreached = (int)ViewBag.SLABreached;
+            double complianceRate = slaTotal > 0 ? Math.Round((double)slaCompliant / slaTotal * 100, 1) : 100;
+        }
+        <div class="px-3 pb-3">
+            <div class="d-flex justify-content-between provms-subtext mb-1">
+                <span>Overall SLA Compliance Rate</span>
+                <span class="fw-semibold @(complianceRate >= 80 ? "text-success" : "text-danger")">@complianceRate%</span>
+            </div>
+            <div class="progress" style="height:6px;border-radius:50rem">
+                <div class="progress-bar @(complianceRate >= 80 ? "bg-success" : complianceRate >= 50 ? "bg-warning" : "bg-danger")"
+                     style="width:@complianceRate%"></div>
+            </div>
+        </div>
+    </div>
+
     @* Charts Row 1 *@
     <div class="row g-4 mb-4">
         <div class="col-md-6">

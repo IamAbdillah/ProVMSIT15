@@ -54,12 +54,12 @@
                         <div class="form-text text-muted">Vendor role is excluded — public portal only.</div>
                     </div>
                     <div class="col-12">
-                        <label class="form-label fw-semibold">Department Code</label>
-                        <input name="departmentCode" class="form-control" placeholder="e.g. IT, HR, FINANCE, OPS" maxlength="20" />
-                        <div class="form-text text-muted">Used for budget pre-encumbrance allocation. Required for User-role accounts.</div>
+                        <label class="form-label fw-semibold">Department Code <span class="text-danger" id="deptRequired" style="display:none">*</span></label>
+                        <input name="departmentCode" id="departmentCode" class="form-control" placeholder="e.g. IT, HR, FINANCE, OPS, PROCUREMENT" maxlength="20" />
+                        <div class="form-text text-muted">Used for budget pre-encumbrance allocation. <strong>Required for User-role accounts</strong> — must match a seeded department (IT, HR, FINANCE, OPS, PROCUREMENT).</div>
                     </div>
                     <div class="col-12 d-flex gap-3 justify-content-end pt-2 border-top mt-2">
-                        <a asp-action="Index" class="btn btn-outline-secondary px-4">Cancel</a>
+                        <a href="#" onclick="openDiscardModal('/UserManagement/Index');return false;" class="btn btn-outline-secondary px-4">Cancel</a>
                         <button type="submit" class="btn btn-primary px-5 fw-semibold">
                             <i class="bi bi-person-check me-2"></i>Provision Account
                         </button>
@@ -69,3 +69,19 @@
         </div>
     </div>
 </div>
+@section Scripts {
+<script>
+(function(){
+    const roleSelect = document.querySelector('select[name="role"]');
+    const deptInput  = document.getElementById('departmentCode');
+    const deptStar   = document.getElementById('deptRequired');
+    function toggle() {
+        const isUser = roleSelect.value === 'User';
+        deptInput.required = isUser;
+        deptStar.style.display = isUser ? '' : 'none';
+    }
+    roleSelect.addEventListener('change', toggle);
+    toggle();
+})();
+</script>
+}

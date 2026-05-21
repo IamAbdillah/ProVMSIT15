@@ -101,25 +101,65 @@ ProVMS eliminates administrative drag from procurement operations by digitizing 
 | **User** | Marketplace browsing, PR submission, delivery confirmation | Juan |
 | **Vendor** | Onboarding wizard, catalog management, PO receipt | Emma |
 
-### Sidebar Module Access Matrix
+### Zero-Trust RBAC Matrix
 
-| Module | Admin | Finance | Procurement | User | Vendor |
-|--------|-------|---------|-------------|------|--------|
-| Dashboard | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Vendor Accreditation Desk | ✅ | ❌ | ✅ | ❌ | ❌ |
-| Vendor Directory | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Vendor Profile (own) | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Marketplace | ❌ | ❌ | ❌ | ✅ | ❌ |
-| My Requests | ❌ | ❌ | ❌ | ✅ | ❌ |
-| Approval Workflow | ✅ | ✅ | ❌ | ❌ | ❌ |
-| PO Vault (full) | ✅ | 📖 Read | ✅ | ❌ | ❌ |
-| PO Vault (own orders) | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Delivery Tracking | ✅ | ❌ | ✅ | ✅ | ✅ |
-| Performance Evaluation | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Leaderboard | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Contract Management | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Procurement Analytics | ✅ | ✅ | ✅ | ❌ | ❌ |
-| User Management | ✅ | ❌ | ❌ | ❌ | ❌ |
+Permissions are enforced at **two layers simultaneously**:
+1. **UI Layer** — sidebar links hidden for unauthorized roles
+2. **API Endpoint Layer** — ASP.NET Core policy attributes block requests and return `HTTP 403`
+
+**Key:** `C` = Create | `R` = Read | `U` = Update (including Archive/State Transition) | `D` = Hard Delete *(not used — all deletions are soft-state transitions)* | `X` = Access Forbidden (HTTP 403)
+
+| Module / Feature Screen | System Admin | Procurement Officer | Finance Manager | Internal User | Registered Vendor |
+|-------------------------|:------------:|:-------------------:|:---------------:|:-------------:|:-----------------:|
+| **Public Signup & Catalog Input** | X | X | X | X | C, R, U (Own Only) |
+| **Vendor Accreditation Desk** | C, R, U (Approve/Suspend) | R, U | X | X | X |
+| **Vendor Directory & Category Mapping** | C, R, U | C, R, U | R | R | X |
+| **Vendor Profile (Own)** | X | X | X | X | C, R, U (Own Only) |
+| **Marketplace Catalog (Browse)** | X | X | X | R | X |
+| **Create / Submit Purchase Request** | X | X | X | C, R, U (Own Only — Archived via Evaluation) | X |
+| **Budget Validation / Approval Queue** | X | X | R, U (Approve/Reject) | X | X |
+| **Requisition Allocation & Vendor Matching** | X | R, U | X | X | X |
+| **PO Vault — Full Access** | R | R, U (Issue PO) | R | X | X |
+| **PO Vault — Own Orders Only** | X | X | X | R (Own Only) | R, U (Fulfill Only) |
+| **Delivery Tracking** | R | R, U | X | R (Own Only) | R, U (Dispatch Only) |
+| **Receipt Confirmation** | X | R, U | X | C, R | X |
+| **Performance Evaluation (Submit)** | X | X | X | C, R (Own Only) | X |
+| **Performance Evaluation (View All)** | R | R, U | R | X | X |
+| **Leaderboard / Scoring** | R | R | R | X | X |
+| **Contract Management** | C, R, U (Status Transition) | C, R, U | R | X | X |
+| **Procurement Analytics / Dashboard** | R | R | R | X | X |
+| **Financial Audit Trail** | R | X | R | X | X |
+| **SLA Milestone Logs** | R | R | R | X | X |
+| **User Management** | C, R, U (Archive via IsArchived) | X | X | X | X |
+
+### Enforcement Policy Map
+
+| ASP.NET Core Policy | Roles Covered | Applied To |
+|--------------------|--------------|------------|
+| `AdminOnly` | Admin | User Management, Vendor UpdateStatus |
+| `ProcurementOrAdmin` | Admin, Procurement | Accreditation Desk, Contract Create/UpdateStatus |
+| `ProcurementOnly` | Procurement | IssuePO, MarkDelivered |
+| `FinanceOnly` | Finance | ApproveBudget, RejectRequisition, BudgetManagement, AllocateBudget |
+| `FinanceOrAdmin` | Finance, Admin | Financial Audit Trail |
+| `AnalyticsViewers` | Admin, Finance, Procurement | Dashboard, Reports, Benchmarking, SLALogs, EvaluationDesk, Leaderboard, Performance, ContractController class-level |
+| `DirectoryViewers` | Admin, Finance, Procurement, User | Vendor Directory |
+| `POVaultViewers` | Admin, Finance, Procurement, User, Vendor | PO Vault (row-filtered by role), DownloadPO |
+| `DeliveryViewers` | Admin, Procurement, User, Vendor | Delivery Tracking (Finance=X) |
+| `RequesterOnly` | User | Marketplace, PlaceRequisition, MyRequests, ConfirmReceipt, GetItemPrice, Evaluation Submit |
+| `VendorOnly` | Vendor | Vendor Profile, MarkInTransit, UpdateCargoStatus, VendorOrders |
+| `InternalUsers` | Admin, Finance, Procurement, User | EvaluationController class-level |
+| `AllAuthenticated` | All roles | Notifications |
+
+### CFO Immutability Enforcement
+
+The following tables are **append-only** — deletion is blocked at the `DbContext` layer and throws `HTTP 500` with a CFO Immutability Violation message:
+
+| Table | Blocked Operation | Enforced By |
+|-------|------------------|-------------|
+| `FinancialAuditTrails` | DELETE | `ApplicationDbContext.EnforceImmutability()` |
+| `PurchaseRequisitions` | DELETE | `ApplicationDbContext.EnforceImmutability()` |
+| `Contracts` | DELETE | `ApplicationDbContext.EnforceImmutability()` |
+| `ContractItems` | DELETE | `ApplicationDbContext.EnforceImmutability()` |
 
 ### Registration & Provisioning Rules
 
@@ -136,7 +176,7 @@ ProVMS eliminates administrative drag from procurement operations by digitizing 
 
 ### MODULE 1: Dashboard (Command Center)
 **URL:** `/Dashboard/Index`
-**Access:** Admin, Finance, Procurement
+**Access:** Admin, Finance, Procurement (User=X, Vendor=X)
 
 **What it shows:**
 - KPI stat cards: Active Vendors, Awaiting Review, Pending Approvals, Total Requisitions
@@ -191,7 +231,7 @@ ProVMS eliminates administrative drag from procurement operations by digitizing 
 
 #### 2C. Vendor Directory
 **URL:** `/Vendor/Directory`
-**Access:** Admin, Finance, Procurement
+**Access:** Admin, Finance, Procurement (C,R,U), User (R only) — Vendor=X
 
 **Features:** Searchable/filterable table of all vendors with status badges, contact info, item count.
 
@@ -219,7 +259,7 @@ Shows the submitting user's own requisitions with current workflow status.
 
 #### 3C. Approval Workflow
 **URL:** `/Catalog/ApprovalWorkflow`
-**Access:** Finance, Admin
+**Access:** Finance only — Admin=X, Procurement=X per RBAC matrix
 
 **Actions:**
 - **Approve** → Status: `Approved_Budget`, Procurement notified
@@ -231,16 +271,16 @@ Shows the submitting user's own requisitions with current workflow status.
 
 ### MODULE 4: PO Vault
 **URL:** `/Catalog/POVault`
-**Access:** Admin (full), Procurement (full), Finance (read-only), User/Vendor (own records)
+**Access:** Admin (R), Procurement (R, Issue PO), Finance (R), User (own records R), Vendor (own records R)
 
 **Workflow Actions:**
 
-| Current Status | Available Action | Result |
-|----------------|-----------------|--------|
-| `Approved_Budget` | Issue PO (Procurement) | → `PO_Issued`, Vendor notified, SLA 72h timer starts |
-| `PO_Issued` | Mark Delivered (after Vendor dispatches) | → `In_Transit` |
-| `In_Transit` | Confirm Delivery (User) | → `Delivered` |
-| `Delivered` | Submit Evaluation (User) | → `Archived`, evaluation recorded |
+| Current Status | Actor | Action | Result |
+|----------------|-------|--------|--------|
+| `Approved_Budget` | Procurement | Issue PO | → `PO_Issued`, Vendor notified, SLA 72h timer starts |
+| `PO_Issued` | Vendor | Mark In Transit (from Delivery Tracking / My Orders) | → `In_Transit`, User notified |
+| `In_Transit` | User | Confirm Receipt (from My Requests) | → `Delivered` |
+| `Delivered` | User | Submit Evaluation | → `Archived`, evaluation recorded |
 
 **SLA Column:** Shows elapsed hours since `POIssuedAt`:
 - 🟢 `sla-ok` — under 48h
@@ -251,17 +291,38 @@ Shows the submitting user's own requisitions with current workflow status.
 
 ---
 
+### MODULE 4B: Delivery Tracking
+**URL:** `/Catalog/DeliveryTracking`
+**Access:** Admin (R), Procurement (R,U), User (R own only), Vendor (R,U dispatch only) — **Finance=X**
+
+**Role-filtered view:**
+- Admin + Procurement see all active shipments
+- User sees only their own orders
+- Vendor sees only orders belonging to their company
+
+**Vendor action:** `Mark In Transit` button → `WorkflowStatus → In_Transit`, User notified.
+
+---
+
+### MODULE 4C: Receipt Confirmation
+**URL:** `/Catalog/MyRequests` (Confirm Receipt button)
+**Access:** User only (own orders, `In_Transit` status required) — Admin=X, Finance=X, Procurement=X, Vendor=X
+
+User clicks **Confirm Receipt** → `WorkflowStatus → Delivered` → redirected to Evaluation submission.
+
+---
+
 ### MODULE 5: Supplier Evaluation
 
 #### 5A. Performance Evaluation
 **URL:** `/Evaluation/Performance`
-**Access:** Admin, Finance, Procurement
+**Access:** Admin, Finance, Procurement — User=X, Vendor=X
 
 Grid of all evaluated transactions with star scores per dimension.
 
 #### 5B. Scoring & Rating (Leaderboard)
 **URL:** `/Evaluation/Leaderboard`
-**Access:** Admin, Finance, Procurement
+**Access:** Admin, Finance, Procurement — User=X, Vendor=X
 
 **Top 3 podium cards** (1st/2nd/3rd place vendors by overall score).
 
@@ -281,7 +342,13 @@ Grid of all evaluated transactions with star scores per dimension.
 
 #### 5C. Evaluation Submission
 **URL:** `/Evaluation/Submit`
-**Access:** User (after Delivered status)
+**Access:** User only (after `Delivered` status, own orders only) — Admin=X, Finance=X, Procurement=X, Vendor=X
+
+#### 5D. Benchmarking
+**URL:** `/Evaluation/Benchmarking`
+**Access:** Admin, Finance, Procurement — User=X, Vendor=X
+
+Radar/spider chart comparing vendor performance across all 3 evaluation dimensions (Delivery, Condition, Communication).
 
 3-axis star rating widget (1–5 stars each) + optional comments text area.
 
@@ -291,19 +358,21 @@ Grid of all evaluated transactions with star scores per dimension.
 
 #### 6A. Contract Lifecycle
 **URL:** `/Contract/Lifecycle`
-**Access:** Admin, Finance, Procurement
+**Access:** Admin (C,R,U,D), Procurement (C,R,U), Finance (R only) — User=X, Vendor=X
 
 Manage contract records with status badges: `Active`, `Expiring`, `Expired`, `Draft`, `Under Negotiation`.
+Finance sees read-only view — New Contract button and Update Status form are hidden.
 
 #### 6B. Negotiations
 **URL:** `/Contract/Negotiations`
-**Access:** Admin, Finance, Procurement
+**Access:** Admin (C,R,U,D), Procurement (C,R,U), Finance (R only) — User=X, Vendor=X
 
 Active negotiation threads and draft workspace.
+Finance sees read-only view — Finalize/Terminate buttons are hidden.
 
 #### 6C. Pricing Board
 **URL:** `/Contract/Pricing`
-**Access:** Admin, Finance, Procurement
+**Access:** Admin (C,R,U,D), Procurement (C,R,U), Finance (R only) — User=X, Vendor=X
 
 Corporate pricing alignment matrix per vendor contract.
 
@@ -313,21 +382,27 @@ Corporate pricing alignment matrix per vendor contract.
 
 #### 7A. Reports & Insights
 **URL:** `/Dashboard/Reports`
-**Access:** Admin, Finance, Procurement
+**Access:** Admin, Finance, Procurement — User=X, Vendor=X
 
-KPI summary + Chart.js visualizations of spend trends.
+KPI summary + Chart.js visualizations of spend trends, vendor scores, category breakdown.
 
 #### 7B. Budget Management
 **URL:** `/Dashboard/BudgetManagement`
-**Access:** Admin, Finance
+**Access:** Finance only — Admin=X, Procurement=X per RBAC matrix
 
-Department budget ledger: allocated vs. spent vs. remaining per fiscal year.
+Department budget ledger: allocated vs. spent vs. remaining per fiscal year. Finance can allocate/update budgets via the form.
 
-#### 7C. Benchmarking
-**URL:** `/Evaluation/Benchmarking`
-**Access:** Admin, Finance, Procurement
+#### 7C. Financial Audit Trail
+**URL:** `/Dashboard/AuditTrail`
+**Access:** Admin (R), Finance (R) — Procurement=X, User=X, Vendor=X
 
-Radar/spider chart comparing vendor performance across all 3 evaluation dimensions.
+Immutable append-only log of every workflow state change. Fields: TransactionType, RecordID, Actor, IP Address, JWT Hash, PayloadBefore/After, Timestamp.
+
+#### 7D. SLA Milestone Logs
+**URL:** `/Dashboard/SLALogs`
+**Access:** Admin (R), Finance (R), Procurement (R) — User=X, Vendor=X
+
+Operational SLA tracking log. Shows Compliant/Breached/Open status per workflow milestone (VendorOnboarding 48h, FinancialCleardown 24h, VendorFulfillment 72h).
 
 ---
 
@@ -336,125 +411,204 @@ Radar/spider chart comparing vendor performance across all 3 evaluation dimensio
 **Access:** Admin only
 
 **Features:**
-- View all internal users with role badges
+- View all active internal users with role badges
 - Provision new user (`/UserManagement/Create`) — assigns Admin/Finance/Procurement/User role
 - Update role inline via dropdown + Save
-- Deactivate user (remove from system)
+- Archive user (soft-delete: sets `IsArchived = true`, row retained in DB, login blocked via global query filter)
 
 **Restriction:** Cannot assign Vendor role through this interface. Vendors self-register only.
+**Immutability:** Archiving never deletes the database row — foreign key references in `PurchaseRequisitions` and `FinancialAuditTrails` remain intact.
 
 ---
 
 ## 5. END-TO-END TRANSACTION WALKTHROUGH
 
-### Scenario: "Corporate Infrastructure Expansion"
-**Goal:** Source 50 Professional Workstations at ₱25,000 each = **₱1,250,000 total**
+### Scenario: "The ₱1.25M IT Infrastructure Upgrade"
+**Goal:** Source 50 Professional Corporate Workstations at ₱25,000 each = **₱1,250,000 total**
+**Architecture Note:** No hard `DELETE` commands — all records transition to an immutable `Archived` state. The 6-table schema (`Users`, `Vendors`, `VendorItems`, `PurchaseRequisitions`, `SupplierEvaluations`, `InAppNotifications`) is append-only for financial data.
+
+**Actors:**
+| Role | Name | Email | Password | Dept Code |
+|------|------|-------|----------|-----------|
+| System Admin | Mark | `admin@provms.com` | `Admin@ProVMS2026!` | `SYS` (auto-seeded) |
+| Finance Manager | Priya | `priya@provms.com` | `Finance@2026!` | `FINANCE` |
+| Procurement Officer | Ben | `ben@provms.com` | `Procure@2026!` | `PROCUREMENT` |
+| Internal User | Juan | `juan@provms.com` | `User@2026!` | `IT` |
+| Vendor | Emma Watson | `emma@techcorp.com` | `Vendor@2026!` | N/A (Vendor) |
 
 ---
 
-**PHASE 1: Vendor Onboarding**
+### STEP 1 — External Vendor Self-Onboarding & Catalog Input
+**Actor:** Emma Watson (Vendor)
+**URL:** `/Vendor/Onboarding`
 
 ```
-Step 1 — Emma (Vendor) visits: http://localhost:5239/Vendor/Onboarding
-  └── Wizard Step 1: CompanyName = "TechCorp Solutions", TaxID = "123456789", Email = "emma@techcorp.com"
-  └── Wizard Step 2: Uploads tax_certificate.pdf (< 5MB)
-  └── Wizard Step 3: Adds item row:
-        ItemName = "ProWorkstation V1"
-        Category = "IT Hardware"
-        UnitPrice = ₱25,000.00
-  └── Clicks Submit
-  └── Result: Vendor status = PendingVerification, Admin bell badge shows 🔔1
+1. Emma fills Wizard Step 1:
+     CompanyName = "TechCorp Solutions"
+     TaxID       = "123456789"
+     Email       = "emma@techcorp.com"
+
+2. Wizard Step 2: Uploads tax_certificate.pdf (validated ≤ 5MB, .pdf only)
+
+3. Wizard Step 3: Adds catalog row:
+     ItemName  = "ProWorkstation V1"
+     Category  = "IT Hardware"
+     UnitPrice = ₱25,000.00
+
+4. Clicks Submit
 ```
 
-**PHASE 2: Admin Accreditation**
+**Security Gate Checks:**
+- UnitPrice field: typing alphabetical characters ("TWENTY FIVE THOUSAND") is blocked by input validation — field shows red border, submit is disabled
+- State: `Vendors.OperationalStatus = PendingVerification` (hidden from Marketplace via status filter)
+- SLA: 48h Accreditation clock starts from `SubmittedAt` timestamp
+- Mark's 🔔 bell badge increments to `🔔 1`
+
+---
+
+### STEP 2 — Administrative Accreditation & Document Vetting
+**Actor:** Mark (System Admin)
+**URL:** `/Vendor/AccreditationDesk`
 
 ```
-Step 2 — Mark (Admin) logs in: admin@provms.com / Admin@ProVMS2026!
-  └── Sees 🔔1 notification → clicks bell → "New vendor registration: TechCorp Solutions"
-  └── Navigates to: /Vendor/AccreditationDesk
-  └── Reviews inline PDF document viewer
-  └── Clicks ✅ Approve
-  └── Result: TechCorp Solutions → OperationalStatus = Active
-              Vendor catalog now visible in Marketplace
-              Emma receives notification: "Your accreditation has been approved"
+1. Mark logs in → bell badge shows 🔔 1
+2. Clicks notification → deep-links directly to AccreditationDesk (no manual navigation)
+3. Reviews inline PDF viewer alongside vendor details
+4. Clicks ✅ Approve
 ```
 
-**PHASE 3: Purchase Requisition**
+**Security Gate Checks:**
+- State: `Vendors.OperationalStatus → Active`; TechCorp items are now visible in Marketplace
+- Emma receives 🔔 notification: "Your accreditation has been approved"
+- SLA: elapsed time delta written to `SLAMilestoneLogs` — if > 48h, `SLABreachStatus = Breached`
+
+---
+
+### STEP 3 — Requisition Demand & Financial Pre-Encumbrance
+**Actor:** Juan (Internal User)
+**URL:** `/Catalog/Marketplace`
 
 ```
-Step 3 — Juan (User) logs in
-  └── Navigates to: /Catalog/Marketplace
-  └── Searches: "Hardware" → selects "ProWorkstation V1" by TechCorp Solutions
-  └── Unit price auto-populates: ₱25,000 (immutable)
-  └── Enters Quantity: 50
-  └── System computes: 50 × ₱25,000 = ₱1,250,000
-  └── Clicks Submit
-  └── Backend checks: IT Dept budget ≥ ₱1,250,000? → YES
-  └── Result: Budget pre-encumbered ₱1,250,000
-              PR created: WorkflowStatus = Pending_Finance
-              Priya (Finance) receives 🔔 notification
+1. Juan searches "Hardware" → selects "ProWorkstation V1" by TechCorp Solutions
+2. UnitPrice auto-populates ₱25,000 (read-only — immutable server-side)
+3. Enters Quantity: 50
+4. System displays computed total: 50 × ₱25,000 = ₱1,250,000 (non-editable)
+5. Clicks Submit Request
 ```
 
-**PHASE 4: Finance Approval**
+**Security Gate Checks:**
+- Anti-tamper: backend discards any client-submitted price; recalculates `50 × VendorItems.UnitPrice` server-side
+- Pre-Encumbrance Guard: `DepartmentBudgets.SpentAmount += ₱1,250,000` — funds locked, cannot be double-spent
+- Budget check: if `RemainingBudget < ₱1,250,000` → HTTP 400 returned, no PR created
+- State: `PurchaseRequisitions.WorkflowStatus = Pending_Finance`
+- SLA: 24h Finance Cleardown clock starts
+- Priya receives 🔔 notification: "PR requires budget clearance"
+
+---
+
+### STEP 4 — Fiscal Clearance & Audit Ledger Sign-Off
+**Actor:** Priya (Finance Manager)
+**URL:** `/Catalog/ApprovalWorkflow`
 
 ```
-Step 4 — Priya (Finance) logs in
-  └── Sees 🔔 notification: "PR #1042 requires budget clearance"
-  └── Navigates to: /Catalog/ApprovalWorkflow
-  └── Reviews: Requester = Juan, Item = ProWorkstation V1, Total = ₱1,250,000
-  └── Clicks ✅ Approve Expenditure
-  └── Result: WorkflowStatus → Approved_Budget
-              Ben (Procurement) receives 🔔 notification
-              Timestamped audit entry created
+1. Priya sees 🔔 notification, navigates to Approval Workflow
+2. Reviews: Requester = Juan | Item = ProWorkstation V1 | Total = ₱1,250,000
+3. Clicks ✅ Approve Expenditure
 ```
 
-**PHASE 5: PO Issuance**
+**Security Gate Checks:**
+- Immutability Capture: server writes a new `FinancialAuditTrails` row — UserID (Priya), Timestamp, Machine IP, JWT hash, PayloadBefore/After — this row can never be deleted (CFO guard throws HTTP 500 on DELETE attempt)
+- State: `WorkflowStatus → Approved_Budget`
+- SLA: 24h delta written to `SLAMilestoneLogs`
+- Ben receives 🔔 notification: "PR budget cleared — ready for PO"
+
+---
+
+### STEP 5 — Procurement Validation & Purchase Order Issuance
+**Actor:** Ben (Procurement Officer)
+**URL:** `/Catalog/POVault`
 
 ```
-Step 5 — Ben (Procurement) logs in
-  └── Sees 🔔 notification: "PR #1042 budget cleared — ready for PO"
-  └── Navigates to: /Catalog/POVault
-  └── Confirms: TechCorp = Active ✅, Budget = Cleared ✅
-  └── Clicks 📄 Issue PO
-  └── Result: WorkflowStatus → PO_Issued
-              POIssuedAt timestamp recorded (72h SLA starts)
-              Emma (Vendor) receives 🔔 notification
-              PO PDF downloadable
+1. Ben sees 🔔 notification, opens PO Vault
+2. Confirms: TechCorp = Active ✅ | Budget = Cleared ✅
+3. Clicks 📄 Issue PO
 ```
 
-**PHASE 6: Vendor Dispatch**
+**Security Gate Checks:**
+- State: `WorkflowStatus → PO_Issued`; `POIssuedAt` timestamp recorded
+- SLA: 72h Vendor Fulfillment clock activates; SLA column shows 🟢 `sla-ok` badge
+- Backend generates iText7 read-only PDF; downloadable from PO Vault
+- Emma receives 🔔 notification: "New PO received — PO-001042"
+
+---
+
+### STEP 6 — Logistics Handling & Cargo Dispatch
+**Actor:** Emma Watson (Vendor)
+**URL:** `/Catalog/DeliveryTracking`
 
 ```
-Step 6 — Emma (Vendor) logs in
-  └── Sees 🔔 notification: "New PO received — PO-001042"
-  └── Navigates to: /Catalog/DeliveryTracking
-  └── Loads 50 workstations, clicks 🚚 Mark as Dispatched
-  └── Result: WorkflowStatus → In_Transit
-              Juan receives 🔔 notification: "Your order is in transit"
-              SLA timer shows elapsed hours
+1. Emma opens her Vendor Orders portal
+2. Loads 50 workstation units onto transport carrier
+3. Clicks 🚚 Mark as Dispatched
 ```
 
-**PHASE 7: Delivery Confirmation & Evaluation**
+**Security Gate Checks:**
+- State: `WorkflowStatus → In_Transit` across the entire system
+- Juan receives 🔔 notification: "Your order PO-001042 is in transit"
+- Zero-Trust isolation check: if Emma attempts to navigate to `/UserManagement/Index`, backend policy guard returns HTTP 403 immediately
+
+---
+
+### STEP 7 — Material Receipt & Evaluation Submission
+**Actor:** Juan (Internal User)
+**URL:** `/Catalog/MyRequests` → `/Evaluation/Submit`
 
 ```
-Step 7 — Juan (User) logs in
-  └── Sees 🔔 notification: "PO-001042 is in transit"
-  └── Receives delivery, navigates to: /Catalog/MyRequests
-  └── Clicks ✅ Confirm Receipt
-  └── Result: WorkflowStatus → Delivered
+Step 7A — Confirm Receipt:
+1. Juan receives delivery of 50 workstations
+2. Navigates to My Requests, finds order row
+3. Clicks ✅ Confirm Material Receipt
+   Result: WorkflowStatus → Delivered
 
-Step 8 — Juan submits evaluation
-  └── Navigates to: /Evaluation/Submit
-  └── Rates:
-        Delivery Speed:   ⭐⭐⭐⭐⭐ (5)
-        Item Condition:   ⭐⭐⭐⭐⭐ (5)
-        Communication:    ⭐⭐⭐⭐⭐ (5)
-        Comment: "Workstations delivered early, fantastic transaction lifecycle response time."
-  └── Clicks Submit
-  └── Result: WorkflowStatus → Archived
-              TechCorp OverallAverage updated in leaderboard
-              Dashboard charts refresh with ₱1,250,000 spend entry
+Step 7B — Submit Evaluation:
+1. Juan navigates to /Evaluation/Submit
+2. Rates the transaction:
+     Delivery Speed:  ⭐⭐⭐⭐⭐ (5)
+     Item Condition:  ⭐⭐⭐⭐⭐ (5)
+     Communication:   ⭐⭐⭐⭐⭐ (5)
+     Comment: "Workstations delivered early, fantastic transaction lifecycle response time."
+3. Clicks Submit Evaluation
+   Result: WorkflowStatus → Archived
+           TechCorp OverallAverage updated in Leaderboard
+           Dashboard charts reflect ₱1,250,000 spend entry
 ```
+
+---
+
+### STEP 8 — Soft-Delete / Archive State Validation
+**Actors:** Mark (Admin) + Juan (Internal User)
+**URLs:** `/UserManagement/Index` and `/Catalog/MyRequests`
+
+```
+Step 8A — User Account Archiving (Mark):
+1. Mark locates a decommissioned employee row in User Management
+2. Clicks 🗄️ Archive button
+   Result: AppUsers.IsArchived → true
+           User disappears from active registry (EF Core global query filter)
+           User cannot log in (login query respects IsArchived filter)
+           Row is NOT deleted from database
+
+Step 8B — Requisition Archive Verification (Juan):
+1. Juan views his My Requests panel
+2. Completed workstation PR shows WorkflowStatus = Archived
+   Result: PR is excluded from active queues but retained in database
+```
+
+**CFO Immutability Audit Checks:**
+- `SELECT * FROM Users WHERE IsArchived = 1;` → archived user row IS present in database (soft-delete confirmed)
+- `SELECT * FROM PurchaseRequisitions WHERE WorkflowStatus = 'Archived';` → PR row IS present (no hard delete)
+- `SELECT * FROM FinancialAuditTrails;` → all audit entries intact; `DELETE` attempt throws HTTP 500
+- Dashboard Charts: Spend analytics remain accurate (₱1,250,000 spend preserved) because underlying records are retained
 
 ---
 
@@ -764,11 +918,12 @@ Each transition must be verified in the PO Vault table.
 ### Core Tables
 
 ```sql
--- Users
-Users (ID, FullName, Email, PasswordHash, UserRole, DepartmentCode, CreatedAt)
+-- Users (IsArchived = soft-delete flag; EF Core global query filter excludes IsArchived=1 from all queries)
+Users (ID, FullName, Email, PasswordHash, UserRole, DepartmentCode, IsArchived, CreatedAt)
 UserRole: ENUM('Admin', 'Procurement', 'Finance', 'User', 'Vendor')
+IsArchived: TINYINT(1) DEFAULT 0  -- 0 = Active, 1 = Archived (login blocked, row retained)
 
--- Vendors
+-- Vendors (OperationalStatus = functional soft-state; Suspended/Blacklisted equivalent to archived)
 Vendors (ID, UserID_FK, CompanyName, TaxID, ContactEmail, DocumentVaultURL,
          OperationalStatus, SubmittedAt, ApprovedAt, UpdatedAt)
 OperationalStatus: ENUM('PendingVerification', 'Active', 'Suspended', 'Blacklisted')
@@ -842,18 +997,20 @@ Vendors ──< Contracts (VendorID)
 ### RBAC Policy Map
 
 | Policy Name | Allowed Roles | Used On |
-|-------------|--------------|---------|
-| `AdminOnly` | Admin | User Management |
-| `ProcurementOrAdmin` | Procurement, Admin | Accreditation Desk, PO Vault write |
-| `FinanceOnly` | Finance | Approval Workflow |
-| `FinanceOrAdmin` | Finance, Admin | Approval Workflow GET |
-| `InternalUsers` | Admin, Finance, Procurement, User | General internal access |
-| `VendorOnly` | Vendor | Vendor Profile, Catalog |
+|-------------|--------------|----------|
+| `AdminOnly` | Admin | User Management, Vendor UpdateStatus |
+| `ProcurementOrAdmin` | Procurement, Admin | Accreditation Desk, Contract Create/UpdateStatus |
+| `ProcurementOnly` | Procurement | IssuePO, MarkDelivered, Requisition Allocation |
+| `FinanceOnly` | Finance | Approval Workflow (ApproveBudget, RejectRequisition), BudgetManagement, AllocateBudget |
+| `FinanceOrAdmin` | Finance, Admin | `/Dashboard/AuditTrail` (Financial Audit Trail view) |
+| `InternalUsers` | Admin, Finance, Procurement, User | EvaluationController class-level |
+| `VendorOnly` | Vendor | Vendor Profile, MarkInTransit, UpdateCargoStatus, VendorOrders |
 | `AllAuthenticated` | All roles | Notifications, shared views |
-| `AnalyticsViewers` | Admin, Finance, Procurement | Dashboard, Reports |
-| `POVaultViewers` | Admin, Finance, Procurement, User, Vendor | PO Vault (row-filtered) |
-| `DirectoryViewers` | Admin, Finance, Procurement | Vendor Directory |
-| `RequesterOnly` | User | Marketplace, Place Requisition |
+| `AnalyticsViewers` | Admin, Finance, Procurement | Dashboard/Index, Reports, EvaluationDesk, Leaderboard, Performance, Benchmarking, ContractController class-level |
+| `POVaultViewers` | Admin, Finance, Procurement, User, Vendor | PO Vault (row-filtered by role), DownloadPO |
+| `DeliveryViewers` | Admin, Procurement, User, Vendor | Delivery Tracking (Finance=X) |
+| `DirectoryViewers` | Admin, Finance, Procurement, User | Vendor Directory (User=R, Vendor=X) |
+| `RequesterOnly` | User | Marketplace, PlaceRequisition, MyRequests, ConfirmReceipt, GetItemPrice, Evaluation Submit |
 
 ### Password Policy
 - Hashed with BCrypt (cost factor 11)
@@ -905,7 +1062,38 @@ OnFinanceReject:
 | Email | `admin@provms.com` |
 | Password | `Admin@ProVMS2026!` |
 | Role | Admin |
+| Dept Code | `SYS` |
 | Note | Password auto-reset on every app startup |
+
+### Test Account Provisioning (Walkthrough Actors)
+
+Provision these accounts via `/UserManagement/Create` before running the walkthrough test.
+
+| Name | Email | Password | Role | Dept Code | Budget Pool |
+|------|-------|----------|------|-----------|-------------|
+| Priya Sharma | `priya@provms.com` | `Finance@2026!` | Finance | `FINANCE` | ₱3,000,000 |
+| Ben Reyes | `ben@provms.com` | `Procure@2026!` | Procurement | `PROCUREMENT` | ₱6,000,000 |
+| Juan dela Cruz | `juan@provms.com` | `User@2026!` | User | `IT` | ₱5,000,000 |
+
+> **Department Code must match a seeded budget row.** All 6 budgets are auto-created on startup:
+
+| Dept Code | Department Name | FY Budget |
+|-----------|----------------|----------|
+| `IT` | Information Technology | ₱5,000,000 |
+| `HR` | Human Resources | ₱2,000,000 |
+| `FINANCE` | Finance Department | ₱3,000,000 |
+| `OPS` | Operations | ₱4,000,000 |
+| `PROCUREMENT` | Procurement Division | ₱6,000,000 |
+| `SYS` | System Administration | ₱1,000,000 |
+
+### Vendor Test Account (Self-Registered)
+| Field | Value |
+|-------|-------|
+| Company | TechCorp Solutions |
+| Email | `emma@techcorp.com` |
+| Password | `Vendor@2026!` |
+| TaxID | `123456789` |
+| Registration | Public wizard `/Vendor/Onboarding` — no Admin provisioning needed |
 
 ### Application URL
 ```
@@ -936,6 +1124,7 @@ dotnet run --no-build
 1. `InitialCreate` — Core schema (Users, Vendors, VendorItems, PRs, Evaluations, Notifications)
 2. `AddContracts` — Contract management tables
 3. `AddSLAAndEncumbrance` — SLA tracking + `IsEncumbered`, `POIssuedAt`, `FinanceSubmittedAt`, `ApprovedAt` fields
+4. `AddUserSoftDelete` — `IsArchived TINYINT(1) DEFAULT 0` on `Users` table (soft-delete / archive architecture)
 
 ---
 
