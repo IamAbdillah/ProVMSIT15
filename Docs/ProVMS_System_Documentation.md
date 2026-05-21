@@ -1,7 +1,7 @@
 # ProVMS — Procurement & Vendor Management System
 ## Complete System Documentation & Manual Testing Guide
 
-**Version:** 1.0 | **Stack:** ASP.NET Core 9.0 MVC + MySQL | **Environment:** `http://localhost:5239`
+**Version:** 1.1 | **Stack:** ASP.NET Core 9.0 MVC + MySQL | **Environment:** `http://localhost:5239` (dev) / `http://erprovms.runasp.net` (production)
 
 ---
 
@@ -974,21 +974,45 @@ Vendors ──< Contracts (VendorID)
 
 ### Authentication Flow
 ```
-[User submits login form]
+[User submits login form + reCAPTCHA v2 checkbox]
          │
          ▼
-[BCrypt.Verify(inputPassword, storedHash)]
+[Google reCAPTCHA siteverify API — must return success=true]
          │
-    ✅ Match
+    ✅ Verified
+         │
+         ▼
+[Phase A: Lockout Gate]
+  • If user.LockoutEnd > UtcNow → BLOCK ("Account locked for 15 minutes")
+         │
+         ▼
+[Phase B: Credential Check — BCrypt.Verify(input, storedHash)]
+  • FAIL → AccessFailedCount++
+    - If count >= 5 → LockoutEnd = UtcNow+15min, reset count to 0
+    - SaveChanges()
+  • PASS → continue
+         │
+         ▼
+[Phase C: Vendor Accreditation Gate]
+  • If UserRole == Vendor AND OperationalStatus != Active → BLOCK
+    - PendingVerification → "pending accreditation review"
+    - Suspended/Blacklisted → "account suspended"
+         │
+         ▼
+[Phase D: Success — Reset Lockout]
+  • AccessFailedCount = 0, LockoutEnd = null
+  • SaveChanges()
          │
          ▼
 [Generate Claims Identity]
   • ClaimTypes.NameIdentifier = UserID
-  • ClaimTypes.Name = Email
+  • ClaimTypes.Name = FullName
   • ClaimTypes.Role = UserRole
+  • DepartmentCode claim
          │
          ▼
-[Issue Encrypted Cookie — HttpOnly, SameSite=Strict]
+[Issue Encrypted Cookie — HttpOnly, SameSite=Lax]
+[Issue JWT token in HttpOnly cookie (provms_jwt)]
          │
          ▼
 [All subsequent requests authenticated via cookie middleware]
@@ -1016,6 +1040,26 @@ Vendors ──< Contracts (VendorID)
 - Hashed with BCrypt (cost factor 11)
 - Never stored in plaintext
 - Seed admin password reset on every startup from `appsettings.json` hash
+
+### Account Lockout Policy
+| Rule | Value |
+|------|-------|
+| Max failed attempts before lockout | 5 consecutive failures |
+| Lockout duration | 15 minutes |
+| Counter reset on | Successful login OR lockout trigger |
+| Tracked field | `Users.AccessFailedCount` + `Users.LockoutEnd` |
+| Scope | Per-account (isolated — does not affect other accounts) |
+
+### reCAPTCHA Policy
+- **Type:** Google reCAPTCHA v2 "I'm not a robot" checkbox
+- **Required:** On every login attempt before credentials are checked
+- **Config:** `ReCaptcha:SiteKey` and `ReCaptcha:SecretKey` in `appsettings.json`
+
+### Vendor Accreditation Gate
+- Vendors can register via the public wizard (`/Vendor/Onboarding`)
+- `UserRole.Vendor` is assigned immediately but **login is blocked** until Admin/Procurement approves the accreditation
+- Login blocked states: `PendingVerification`, `Suspended`, `Blacklisted`
+- Login allowed state: `Active` only
 
 ---
 
@@ -1094,10 +1138,12 @@ Provision these accounts via `/UserManagement/Create` before running the walkthr
 | Password | `Vendor@2026!` |
 | TaxID | `123456789` |
 | Registration | Public wizard `/Vendor/Onboarding` — no Admin provisioning needed |
+| Login Access | **Blocked until Admin/Procurement approves** at `/Vendor/AccreditationDesk` |
 
 ### Application URL
 ```
-http://localhost:5239
+Development:  http://localhost:5239
+Production:   http://erprovms.runasp.net
 ```
 
 ### Database Connection
@@ -1125,6 +1171,7 @@ dotnet run --no-build
 2. `AddContracts` — Contract management tables
 3. `AddSLAAndEncumbrance` — SLA tracking + `IsEncumbered`, `POIssuedAt`, `FinanceSubmittedAt`, `ApprovedAt` fields
 4. `AddUserSoftDelete` — `IsArchived TINYINT(1) DEFAULT 0` on `Users` table (soft-delete / archive architecture)
+5. `AddAccountLockout` — `AccessFailedCount INT DEFAULT 0` + `LockoutEnd DATETIME(6) NULL` on `Users` table
 
 ---
 
@@ -1141,5 +1188,5 @@ dotnet run --no-build
 
 ---
 
-*Document generated for ProVMS v1.0 — ASP.NET Core 9.0 MVC*
+*Document generated for ProVMS v1.1 — ASP.NET Core 9.0 MVC*
 *For internal use only — Manual Testing & QA Reference*
